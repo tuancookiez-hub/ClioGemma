@@ -39,3 +39,12 @@ bundled in this image—the platform evaluator remains external.
 See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
 participant-guide contract, architecture, competitor comparison, score
 history, release checklist, and the honest `0.92+` assessment.
+
+## Streamlit demo
+
+The public human-facing demo is `streamlit_app.py`. Deploy it on Streamlit
+Community Cloud with the repository root as the app and add a restricted
+Novita key through Streamlit Secrets. See
+[docs/STREAMLIT_DEPLOYMENT.md](docs/STREAMLIT_DEPLOYMENT.md). The evaluator
+still runs the Docker entrypoint above; the demo does not replace the
+`/input/tasks.json` → `/output/results.json` contract.
