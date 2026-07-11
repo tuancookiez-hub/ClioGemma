@@ -49,11 +49,11 @@ Recommended selections:
 
 ### Public GitHub repository
 
-`https://github.com/<your-account>/cliogemma`
+`https://github.com/tuancookiez-hub/ClioGemma`
 
 The repository must contain the current release tree, a README with build/run
-instructions, and no API keys. The current local tree is intentionally
-uncommitted after reconstruction; commit and review it before submitting.
+instructions, and no API keys. Merge the release and Streamlit changes to
+`main` before creating the public demo URL.
 
 ### Public Docker image
 
@@ -78,9 +78,10 @@ repository or paste it into the project description.
 
 ### Demo/application URL
 
-Use a publicly reachable demo URL only if one exists. If the form accepts a
-container reference instead, provide the public registry image above. Do not
-claim that a local Docker tag is publicly runnable.
+Use the final public `.streamlit.app` URL created from `streamlit_app.py`. The
+deployment steps and exact Streamlit Secrets names are in
+[docs/STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md). Do not claim that a
+local URL or local Docker tag is publicly runnable.
 
 ### Cover image, video, and slides
 

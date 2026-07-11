@@ -25,6 +25,23 @@ docker buildx build --platform linux/amd64 \
   --push .
 ```
 
+The default release samples five anchor frames. For a controlled leaderboard
+A/B test, build a separate immutable tag with three anchors (the strongest
+public competitor variant uses three):
+
+```bash
+docker buildx build --platform linux/amd64 \
+  --build-arg CLIO_API_KEY="$NOVITA_API_KEY" \
+  --build-arg CLIO_MODEL=google/gemma-3-27b-it \
+  --build-arg SWIFTCLIP_FRAME_COUNT=3 \
+  --tag <public-registry>/<user>/cliogemma:gemma3-3frames \
+  --push .
+```
+
+Keep the five-frame and three-frame tags separate and change one variable per
+submission; the leaderboard result, not a local proxy score, decides which
+variant to keep.
+
 Track 2 permits credentials inside the image because no key is injected by the
 harness. Use a restricted, revocable key and rotate it after submission. Never
 commit the key or put it in documentation.
@@ -39,3 +56,12 @@ bundled in this image—the platform evaluator remains external.
 See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
 participant-guide contract, architecture, competitor comparison, score
 history, release checklist, and the honest `0.92+` assessment.
+
+## Streamlit demo
+
+The public human-facing demo is `streamlit_app.py`. Deploy it on Streamlit
+Community Cloud with the repository root as the app and add a restricted
+Novita key through Streamlit Secrets. See
+[docs/STREAMLIT_DEPLOYMENT.md](docs/STREAMLIT_DEPLOYMENT.md). The evaluator
+still runs the Docker entrypoint above; the demo does not replace the
+`/input/tasks.json` → `/output/results.json` contract.
