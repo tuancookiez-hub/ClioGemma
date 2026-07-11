@@ -170,8 +170,10 @@ parallelism, timestamp, score, and observed evaluator error.
 - [x] Six repository tests pass.
 - [x] Real Gemma 4 text and image calls pass.
 - [x] All eight official retired validation clips pass within 570 seconds.
-- [ ] Commit and push this candidate source.
-- [ ] Build and push the exact public `gemma4-4f-verified5-p2-r1` image.
-- [ ] Pull anonymously and verify its linux/amd64 digest.
-- [ ] Run the exact published image against mounted input/output.
+- [x] Commit and push candidate source (`d4d1a36`).
+- [x] Build and push the exact public `gemma4-4f-verified5-p2-r1` image.
+- [x] Pull anonymously and verify linux/amd64 digest
+  `sha256:42b6db6e6438d1adbb34f3d4120d02a0f24b7c5616fb24df51f1a21ce63a97b5`.
+- [x] Run the exact published image against mounted input/output: 3/3 retired
+  clips, 12/12 captions, exit 0, 170.3 seconds at parallelism one.
 - [ ] Submit the exact registry reference and record the official score.

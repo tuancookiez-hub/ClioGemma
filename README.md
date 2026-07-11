@@ -67,6 +67,10 @@ rotate it after judging; never commit it to Git.
 These are reliability and qualitative checks, not a substitute for the hidden
 AMD score. Only the leaderboard can confirm a score above 0.92.
 
+Published candidate:
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-p2-r1`  
+Digest: `sha256:42b6db6e6438d1adbb34f3d4120d02a0f24b7c5616fb24df51f1a21ce63a97b5`
+
 See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
 score diagnosis, competitor evidence, provenance caveats, and experiment plan.
 
