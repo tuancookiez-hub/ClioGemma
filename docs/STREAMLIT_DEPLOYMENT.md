@@ -23,8 +23,9 @@ replacement for that container.
    ```
 
    Never commit these values. Rotate the key after the hackathon.
-4. Upload a short MP4 and generate captions. The demo uses the same five
-   anchor frames and one structured Gemma request as the production release.
+4. Upload a short MP4 and generate captions. The hosted demo is a lightweight
+   presentation surface and may use the fast path; the scored Docker image uses
+   the verified multi-stage path documented in the root README.
 
 `packages.txt` installs FFmpeg on Streamlit Community Cloud. If the app shows
 an FFmpeg error, open **Manage app → Reboot app** after the dependency install
@@ -42,8 +43,8 @@ has completed.
 Suggested additional information:
 
 > ClioGemma is a Track 2 video-captioning container and Streamlit demo. The
-> public demo uses Novita-hosted Gemma inference, five chronological FFmpeg
-> anchor frames, grounded prompts, and four requested caption styles. The
+> public demo uses Novita-hosted Gemma inference, chronological FFmpeg
+> frames, grounded prompts, and four requested caption styles. The
 > submitted Docker image reads `/input/tasks.json` and writes
 > `/output/results.json` for `linux/amd64`. No API key is stored in GitHub;
 > the demo key is supplied through Streamlit Secrets.

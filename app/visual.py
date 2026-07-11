@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -60,7 +61,7 @@ def run_task_combined(video_url: str, task_id: str, styles: list[str], out_dir: 
 def runtime_config() -> tuple[float, float, int]:
     hard = min(float(os.environ.get("SWIFTCLIP_DEADLINE_S", "570")), 570.0)
     per_clip = min(float(os.environ.get("SWIFTCLIP_CLIP_TIMEOUT", "125")), hard)
-    parallel = min(int(os.environ.get("SWIFTCLIP_PARALLEL", "3")), 8)
+    parallel = min(int(os.environ.get("SWIFTCLIP_PARALLEL", "2")), 8)
     if hard <= 0 or per_clip <= 0 or parallel <= 0:
         raise ValueError("runtime values must be positive")
     return hard, per_clip, parallel
@@ -98,21 +99,30 @@ def run(input_path: Path, output_path: Path) -> int:
             print(f"task {task_id} failed: {error}", file=sys.stderr)
             return {"task_id": task_id, "captions": _fallback(styles)}
 
-    results: list[dict | None] = [None] * len(tasks)
+    results: list[dict] = []
+    for index, raw in enumerate(tasks):
+        task = raw if isinstance(raw, dict) else {}
+        styles = [str(style) for style in (task.get("styles") or STYLES)]
+        results.append({"task_id": str(task.get("task_id", f"t{index}")), "captions": _fallback(styles)})
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    write_lock = threading.Lock()
+
+    def persist() -> None:
+        with write_lock:
+            temporary = output_path.with_name(output_path.name + ".tmp")
+            temporary.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+            temporary.replace(output_path)
+
+    persist()
     with ThreadPoolExecutor(max_workers=parallel) as executor:
         futures = {executor.submit(process, index): index for index in range(len(tasks))}
         try:
             for future in as_completed(futures, timeout=max(1.0, global_end - time.monotonic())):
                 results[futures[future]] = future.result()
+                persist()
         except TimeoutError:
             print("global timeout; filling incomplete tasks", file=sys.stderr)
-    for index, result in enumerate(results):
-        if result is None:
-            task = tasks[index] if isinstance(tasks[index], dict) else {}
-            styles = [str(style) for style in (task.get("styles") or STYLES)]
-            results[index] = {"task_id": str(task.get("task_id", f"t{index}")), "captions": _fallback(styles)}
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    persist()
     return 0
 
 

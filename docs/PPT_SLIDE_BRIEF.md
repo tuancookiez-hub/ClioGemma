@@ -1,190 +1,122 @@
-# ClioGemma — PPT Brief for a Slide-Deck Agent
+# ClioGemma - slide deck brief
 
-## Purpose
-
-Create a concise, polished 7–9 slide presentation for AMD Developer Hackathon
-ACT II, Track 2: Video Captioning. The deck should make the project easy to
-understand, technically credible, and honest about what has and has not been
-measured.
+Create a polished 7-8 slide deck about how the project works. Focus on the
+problem, user value, architecture, and reproducibility. Do not make the deck a
+leaderboard-results report.
 
 ## Core message
 
-**ClioGemma turns one short video into four grounded captions in a reproducible,
-AMD-compatible Docker container.** It uses Novita-hosted Google Gemma
-multimodal inference, chronological visual evidence, strict JSON output, and
-bounded runtime controls.
+**ClioGemma separates seeing from writing: Gemma verifies what happened first,
+then expresses the same evidence in four distinct voices.**
 
-## Audience and judging context
+## Slide plan
 
-- Track 2 asks for four styles: formal, sarcastic, humorous-tech, and
-  humorous-non-tech.
-- The attached Participant Guide is the controlling technical contract.
-- The container reads `/input/tasks.json` and writes `/output/results.json`.
-- Hidden clips are unseen by the agent; do not imply hardcoded answers.
-- The Gemma prize matters: present Gemma as the central model family.
+### 1. Title
 
-## Slide-by-slide plan
+- ClioGemma
+- Evidence-first video captioning with Gemma
+- AMD Developer Hackathon ACT II - Track 2
 
-### Slide 1 — Title
+Visual: one video strip branching into four caption cards.
 
-Title: **ClioGemma**
+### 2. The challenge
 
-Subtitle: **Evidence-first video captioning with Gemma**
+One clip must produce four tones without changing the facts:
 
-Small footer: AMD Developer Hackathon ACT II · Track 2 · Video Captioning
+- formal
+- sarcastic
+- humorous-tech
+- humorous-non-tech
 
-Visual: a horizontal video strip transforming into four caption cards. Use a
-clean blue/teal AMD-compatible technology aesthetic with a warm accent for the
-humorous styles.
+Emphasize that style creativity and factual grounding pull in opposite
+directions.
 
-### Slide 2 — The problem
+### 3. Product flow
 
-Headline: **One video, four very different communication goals**
+1. Receive a video task.
+2. Sample eight chronological moments.
+3. Build and verify a factual record.
+4. Write two alternatives for each requested style.
+5. Select the strongest grounded alternative against the images.
+6. Return evaluator-ready JSON.
 
-Show four cards:
-
-- Formal: objective and factual
-- Sarcastic: accurate with dry irony
-- Humorous-tech: accurate with one technology analogy
-- Humorous-non-tech: accurate with an everyday analogy
-
-Speaker point: style must change without changing the visible facts.
-
-### Slide 3 — The solution
-
-Headline: **Ground the facts first, then change the voice**
-
-Three short steps:
-
-1. Sample the video at five chronological anchor points.
-2. Ask one Gemma vision call for all four styles in structured JSON.
-3. Validate the schema and emit a deterministic, evaluator-ready result.
-
-Include a small example showing one visible scene branching into the four
-styles. Use labels such as “same evidence” and “different voice.”
-
-### Slide 4 — Architecture
-
-Headline: **Small, bounded, reproducible production path**
-
-Use this diagram as the source for the visual:
+### 4. Architecture
 
 ```mermaid
 flowchart LR
-    A["/input/tasks.json"] --> B["Docker entrypoint"]
-    B --> C["Download clip"]
-    C --> D["FFmpeg + ffprobe"]
-    D --> E["5 chronological anchor frames"]
-    E --> F["Novita API"]
-    F --> G["Gemma 3 27B\nGemma 4 31B A/B"]
-    G --> H["Strict four-style JSON parser"]
+    A["/input/tasks.json"] --> B["Download + FFmpeg"]
+    B --> C["8 chronological anchors"]
+    C --> D["Gemma 4 evidence record"]
+    D --> E["Gemma 4 visual verification"]
+    E --> F["4 persona writers x 2 candidates"]
+    F --> G["Frame-aware candidate selector"]
+    G --> H["Schema validation"]
     H --> I["/output/results.json"]
 ```
 
-Callouts:
+Callouts: Novita-only, Gemma-only, no separate judge, Linux/amd64, bounded
+runtime.
 
-- Novita-only provider lock
-- Gemma-only model allowlist
-- No embedded judge
-- Parallel clip processing
-- Linux/amd64 image
+### 5. Grounding design
 
-### Slide 5 — Grounding and style controls
+Show the structured evidence fields:
 
-Headline: **The prompt is designed to reduce hallucination before it reaches JSON**
+- scene
+- subjects
+- stable facts
+- beginning / middle / end
+- caption anchor
+- clearly readable text
+- do-not-claim ledger
 
-Show a checklist:
+Explain that the negative ledger is as important as the visible facts because
+it blocks inferred motives, identities, locations, counts, and unseen outcomes.
 
-- Visible subject, action/state, and setting first
-- No invented identities, locations, brands, counts, motives, audio, or future
-  events
-- No treating a hand near an object as proof of a completed action
-- Same literal visual anchor across all styles
-- Silent final verification before returning JSON
+### 6. Four voices, one event
 
-### Slide 6 — Reliability and submission contract
+Use one real example and show four short caption cards. The literal subject and
+action should remain recognizable in all four while the sentence shape and
+tone change.
 
-Headline: **Built for the evaluator, not a demo-only path**
+### 7. Built for the evaluator
 
-Show the contract:
+- public Linux/amd64 Docker image
+- exact `/input/tasks.json` to `/output/results.json` contract
+- requested keys only
+- two concurrent clips
+- bounded provider calls and 570-second global limit
+- no hardcoded test-video answers
+- public Streamlit demo is separate from the scoring entrypoint
 
-- Reads `/input/tasks.json`
-- Writes valid `/output/results.json`
-- Returns every requested style
-- `linux/amd64` Docker image
-- Five frames per clip by default
-- Three clips processed concurrently
-- 25-second model request timeout
-- 125-second per-clip budget
-- 570-second global budget
+### 8. Close
 
-### Slide 7 — Evidence and current status
+Headline: **See carefully. Verify twice. Write with personality.**
 
-Headline: **Verified locally; leaderboard measurement is next**
-
-Use only these metrics:
-
-- `3 passed` release contract tests
-- `linux/amd64` image build passed
-- Novita Gemma 3 27B one-clip smoke: four non-empty styles in ~7.3 seconds
-- Historical Gemma-only development proxy: approximately `0.871`
-
-Add a clear footnote: **The current AMD leaderboard score has not yet been
-measured for this reconstructed release. Do not claim 0.92 or 0.95 in the deck.**
-
-### Slide 8 — Demo flow
-
-Headline: **From task file to four captions**
-
-60-second narration:
-
-1. Show one input task and the short video.
-2. Show five sampled frames.
-3. Show the Gemma structured response.
-4. Show the four final captions.
-5. Show the output JSON path and Docker command.
-
-End with: **Same evidence. Four voices. One reproducible container.**
-
-### Slide 9 — Roadmap / close
-
-Headline: **A measured path to higher quality**
-
-Near-term experiments, one variable at a time:
-
-- Gemma 3 27B with 4, 5, and 8 anchors
-- Gemma 4 31B only if request latency stays below the guide limit
-- Compare returned AMD scores across up to 10 submissions per hour
-- Preserve the best public image tag and record the result
-
-Close with the project title and public repository/image placeholders.
+Include the GitHub repository, demo URL, and public image reference.
 
 ## Design direction
 
-- Use a dark navy or deep teal base with white text and electric blue accents.
-- Use four distinct caption colors, one per style, but keep the formal style
-  visually restrained.
-- Prefer diagrams, short labels, and one concrete example over paragraphs.
-- Use monospace styling for paths, JSON keys, Docker commands, and model IDs.
-- Keep slides readable at presentation distance; no dense source-code blocks.
-- Include alt text or speaker notes for architecture diagrams.
+- Use the existing black, ivory, and gold ClioGemma visual identity.
+- Keep body text short; prefer diagrams, caption cards, and frame strips.
+- Use gold for evidence/verification and distinct restrained colors for the
+  four style cards.
+- Use monospace only for paths, model IDs, and JSON keys.
+- Keep the emblem small and crisp; do not place decorative artifacts in the
+  top-left corner.
 
-## Claims the deck must not make
+## Claims to avoid
 
-- Do not claim a current score above `0.91`.
-- Do not claim `0.92`, `0.95`, or first place before the evaluator confirms it.
-- Do not claim audio transcription, external self-evaluation, Claude, Gemini,
-  Fireworks, or a second provider in the production image.
-- Do not say the project uses a local judge. The platform judge is external.
-- Do not show or mention API keys.
-- Do not imply the historical `0.871` proxy is an official leaderboard score.
+- Do not claim a score above 0.92 unless the exact image digest receives it.
+- Do not describe the older 0.85 image as the current architecture.
+- Do not claim Claude, Kimi, Gemini, Fireworks, Whisper, or an external judge
+  is used in production.
+- Do not expose credentials.
 
-## Source files for the slide agent
+## Source files
 
-- `README.md` — public-facing build and model summary
-- `docs/CURRENT_RELEASE_REVIEW.md` — authoritative architecture, compliance,
-  score caveats, and submission ladder
-- `docs/SUBMISSION_FORM_COPY.md` — exact platform field copy
-- `Dockerfile` — container contract and runtime defaults
-- `app/visual.py` — batch runner and JSON output behavior
-- `app/evidence_pipeline.py` — prompt and Gemma call path
+- `README.md`
+- `docs/CURRENT_RELEASE_REVIEW.md`
+- `docs/SUBMISSION_FORM_COPY.md`
+- `Dockerfile`
+- `app/visual.py`
+- `app/evidence_pipeline.py`

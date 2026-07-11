@@ -1,67 +1,86 @@
 # ClioGemma - AMD Developer Hackathon ACT II, Track 2
 
-This is the production Docker submission for video captioning. It reads
-`/input/tasks.json` and writes `/output/results.json` with the requested
-`formal`, `sarcastic`, `humorous_tech`, and `humorous_non_tech` captions.
+ClioGemma is a Dockerized video-captioning agent. It reads
+`/input/tasks.json`, downloads each video, and writes `/output/results.json`
+with the requested `formal`, `sarcastic`, `humorous_tech`, and
+`humorous_non_tech` captions.
 
-Production inference is Novita-only and Gemma-only:
+The current confirmed leaderboard score is **0.85**. That score belongs to the
+older four-frame `verified5` image, not the eight-frame candidate in this source
+tree. The new image has not yet received an AMD score.
 
-- `google/gemma-3-27b-it` (default, lower-latency release candidate)
-- `google/gemma-4-31b-it` (explicit A/B variant)
+## Current candidate
 
-The image has no external judge, Claude/Gemini fallback, audio model, or
-text-only provider. The release path makes one structured multimodal Gemma
-request per clip. If a clip fails, the runner emits a deterministic
-schema-preserving placeholder so the submission remains valid; this is not a
-second model/provider fallback.
+The next release candidate is Novita-only and Gemma-only:
 
-## Build for submission
+```text
+video
+  -> eight chronological visual anchors
+  -> Gemma 4 factual evidence record with an explicit do-not-claim ledger
+  -> second Gemma 4 visual verification pass
+  -> one direct multimodal writer per style, producing two alternatives
+  -> Gemma 4 visual selector compares both alternatives against six anchors
+  -> deterministic schema, length, cliché, and style validation
+  -> /output/results.json
+```
 
-```bash
-docker buildx build --platform linux/amd64 \
-  --build-arg CLIO_API_KEY="$NOVITA_API_KEY" \
-  --build-arg CLIO_MODEL=google/gemma-3-27b-it \
-  --tag <public-registry>/<user>/cliogemma:release-1 \
+There is no Claude, Kimi, Gemini, external judge, or provider fallback in the
+image. The observer, verifier, persona writers, and visual selector all use
+`google/gemma-4-31b-it` through Novita. The selector is part of caption
+generation, not a separate scoring model or provider.
+
+This architecture combines verified evidence with the strongest lesson from
+the public 0.91-0.92 systems and AMD's retired validation examples: every
+creative style needs a distinctive voice, bold figurative humor, and concrete
+visible details. ClioGemma adds pairwise alternatives, a frame-aware selector,
+stock-phrase rejection, and a rule that prevents uncertain peripheral text
+from becoming a literal caption claim.
+
+## Build the leaderboard candidate
+
+PowerShell:
+
+```powershell
+docker buildx build --platform linux/amd64 `
+  --provenance=false --sbom=false `
+  --build-arg CLIO_API_KEY="$env:NOVITA_API_KEY" `
+  --build-arg CLIO_MODEL=google/gemma-4-31b-it `
+  --build-arg CLIO_VERIFY_MODEL=google/gemma-4-31b-it `
+  --build-arg CLIO_CAPTION_MODEL=google/gemma-4-31b-it `
+  --build-arg CLIO_PIPELINE=verified7 `
+  --build-arg SWIFTCLIP_FRAME_COUNT=8 `
+  --build-arg SWIFTCLIP_FRAME_WIDTH=768 `
+  --build-arg SWIFTCLIP_PARALLEL=2 `
+  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-8f-pairs-picker-p2-r1 `
   --push .
 ```
 
-The default release samples five anchor frames. For a controlled leaderboard
-A/B test, build a separate immutable tag with three anchors (the strongest
-public competitor variant uses three):
+Track 2 does not inject a provider key. Use a restricted, revocable key and
+rotate it after judging; never commit it to Git.
 
-```bash
-docker buildx build --platform linux/amd64 \
-  --build-arg CLIO_API_KEY="$NOVITA_API_KEY" \
-  --build-arg CLIO_MODEL=google/gemma-3-27b-it \
-  --build-arg SWIFTCLIP_FRAME_COUNT=3 \
-  --tag <public-registry>/<user>/cliogemma:gemma3-3frames \
-  --push .
-```
+## Verification status
 
-Keep the five-frame and three-frame tags separate and change one variable per
-submission; the leaderboard result, not a local proxy score, decides which
-variant to keep.
+- Six repository tests pass.
+- Python compilation passes.
+- The exact final source completed all eight retired validation videos: 8/8
+  tasks, 32/32 captions, exit code zero in 218.4 seconds at parallelism two.
+- The pulled public image completed a judge-style test with only `/input` and
+  `/output` mounted: 2/2 tasks, 8/8 captions, valid schema, exit zero in 103.3
+  seconds.
+- Anonymous GHCR manifest access returned HTTP 200.
 
-Track 2 permits credentials inside the image because no key is injected by the
-harness. Use a restricted, revocable key and rotate it after submission. Never
-commit the key or put it in documentation.
+These are reliability and qualitative checks, not a substitute for the hidden
+AMD score. Only the leaderboard can confirm a score above 0.92.
 
-The attached Participant Guide is the release contract for this package. The
-public event page has broader Fireworks/LLM-judge wording; verify the live
-submission validator before publishing. “No judge” here means no judge is
-bundled in this image—the platform evaluator remains external.
+Published candidate:
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-8f-pairs-picker-p2-r1`
 
-## Review document
+Digest: `sha256:b0f2f7040b94b0cb7a994c5ebea5ff08d85e8addc759d494009581765ef7d026`
 
 See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
-participant-guide contract, architecture, competitor comparison, score
-history, release checklist, and the honest `0.92+` assessment.
+score diagnosis, competitor evidence, provenance caveats, and experiment plan.
 
 ## Streamlit demo
 
-The public human-facing demo is `streamlit_app.py`. Deploy it on Streamlit
-Community Cloud with the repository root as the app and add a restricted
-Novita key through Streamlit Secrets. See
-[docs/STREAMLIT_DEPLOYMENT.md](docs/STREAMLIT_DEPLOYMENT.md). The evaluator
-still runs the Docker entrypoint above; the demo does not replace the
-`/input/tasks.json` → `/output/results.json` contract.
+The human-facing demo is `streamlit_app.py`. It is separate from the evaluator
+entrypoint. See [docs/STREAMLIT_DEPLOYMENT.md](docs/STREAMLIT_DEPLOYMENT.md).
