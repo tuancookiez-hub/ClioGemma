@@ -67,7 +67,7 @@ Verified public digest:
 - [x] Pull it and verify anonymous manifest access.
 - [x] Run the exact published tag with mounted `/input` and `/output`.
 - [x] Confirm every task ID and requested style is present and non-empty.
-- [ ] Push the current source and documentation to GitHub.
+- [x] Push the current source and documentation to GitHub.
 - [ ] Enter the public Streamlit URL.
 - [ ] Submit the registry reference, not the Docker Hub/GHCR web page URL.
 - [ ] Record the returned leaderboard score against the image digest.
