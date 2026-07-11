@@ -683,6 +683,7 @@ def _write_verified3_style(
     config: ProviderConfig,
     deadline: float | None,
     frames: list[Frame] | None = None,
+    concise: bool = False,
 ) -> str:
     anchor = _normalize_anchor(str(evidence.get("caption_anchor", "")))
     prior_note = ""
@@ -711,9 +712,24 @@ def _write_verified3_style(
         if style != "formal"
         else "The verified evidence is a hard ceiling; every statement must be literal and supported. "
     )
-    length_rule = "Write 18-48 words" if style == "formal" else "Write 12-40 words"
+    length_rule = (
+        "Aim for 18-30 words, hard bounds 14-34, with one crisp factual sentence"
+        if style == "formal"
+        else "Aim for 16-28 words, hard bounds 12-32, with one crisp sentence or two short sentences"
+    ) if concise else ("Write 18-48 words" if style == "formal" else "Write 12-40 words")
+    calibration = ""
+    if concise:
+        calibration = (
+            "\n\nSTYLE CALIBRATION EXAMPLES — style patterns only; never copy their facts:\n"
+            "formal: A city boulevard lined with autumn trees carries steady traffic beneath apartment towers.\n"
+            "sarcastic: The city decorated the commute, apparently hoping traffic would count as sightseeing.\n"
+            "humorous_tech: Nature's annual deployment updates the leaf nodes to yellow while the traffic queue keeps processing.\n"
+            "humorous_non_tech: The trees planned a better show than the people stuck underneath them.\n"
+            "Prefer a precise visible detail and one clean style beat over a long inventory. Avoid filler, invented names, and explanations."
+        )
     prompt = (
         _VERIFIED3_STYLE_PROMPTS[style]
+        + calibration
         + "\n\n"
         + creative_rule
         + length_rule
@@ -724,14 +740,14 @@ def _write_verified3_style(
         + json.dumps(evidence, ensure_ascii=False, indent=2)
     )
     persona_mode = bool(frames)
-    temperature = 0.2 if style == "formal" else (0.82 if persona_mode else 0.7)
+    temperature = 0.15 if style == "formal" else (0.65 if concise else (0.82 if persona_mode else 0.7))
     content = _timeline_content(frames, prompt) if frames else [{"type": "text", "text": prompt}]
     caption = _normalize(
         _call(
             config,
             content,
             deadline=deadline,
-            max_tokens=240,
+            max_tokens=210 if concise else 240,
             temperature=temperature,
         )
     )
@@ -817,7 +833,8 @@ def _deterministic_verified_caption(style: str, evidence: dict) -> str:
 
 def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
-    persona_mode = pipeline in {"verified5", "verified-5", "persona", "persona-grounded"}
+    concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
+    persona_mode = pipeline in {"verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "persona", "persona-grounded"}
     anchors = _four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames)
     try:
         draft_raw = _call(
@@ -857,16 +874,21 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                 caption_config,
                 deadline,
                 anchors if persona_mode else None,
+                concise_mode,
             )
         except Exception as error:
             _log(f"verified3 {style} writer unavailable; using evidence-bound local caption: {error}")
             caption = _deterministic_verified_caption(style, evidence)
         captions[style] = caption
         prior.append(caption)
-    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "persona", "persona-grounded"}:
+    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "persona", "persona-grounded"}:
         final_prompt = _VERIFIED4_FINAL_PROMPT.format(
             evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
             captions=json.dumps(captions, ensure_ascii=False, indent=2),
+        ) + (
+            "\nKeep every caption compact: formal 14-34 words; each creative style 12-32 words. "
+            "Prefer one sentence or two short sentences, preserving one concrete visible detail and one clear style beat."
+            if concise_mode else ""
         )
         try:
             reviewed_raw = _call(
@@ -878,7 +900,11 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
             )
             reviewed = _parse_fast(reviewed_raw)
             anchor = str(evidence.get("caption_anchor", ""))
-            if _issue_count(_caption_batch_issues(reviewed, anchor)) <= _issue_count(_caption_batch_issues(captions, anchor)):
+            concise_ok = all(
+                14 <= len(text.split()) <= (34 if style == "formal" else 32)
+                for style, text in reviewed.items()
+            ) if concise_mode else True
+            if concise_ok and _issue_count(_caption_batch_issues(reviewed, anchor)) <= _issue_count(_caption_batch_issues(captions, anchor)):
                 captions = reviewed
         except Exception as error:
             _log(f"verified4 final grounding revision skipped: {error}")
@@ -1010,7 +1036,8 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
     if pipeline in {
         "verified3", "verified-3", "verified-sequential",
         "verified4", "verified-4", "champion",
-        "verified5", "verified-5", "persona", "persona-grounded",
+        "verified5", "verified-5", "verified5-concise", "verified-5-concise",
+        "precision", "concise", "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline)
     if pipeline in {"verified2", "verified-2", "two-stage"}:
