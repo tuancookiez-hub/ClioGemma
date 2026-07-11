@@ -189,6 +189,7 @@ keys:
   "subjects": ["generic visible subjects and objects"],
   "stable_facts": ["concrete facts directly supported by the images"],
   "timeline": ["beginning: ...", "middle: ...", "end: ..."],
+  "scene_story": "two dense factual sentences covering how the clip begins, develops, and ends",
   "caption_anchor": "one complete present-tense sentence of 6-14 words stating one conservative main action or state; capitalize it; do not join two actions with and",
   "visible_text": ["only large, central, unquestionably readable text"],
   "do_not_claim": ["plausible but unsupported identities, actions, counts, motives, relationships, brands, locations, audio, or outcomes"]
@@ -218,20 +219,26 @@ narrate the obvious. Make the sarcasm unmistakable, dry, and genuinely witty,
 not merely a formal caption with 'apparently' added. Include a concrete visible
 subject, action or state, and detail. You may personify the subject or invent an
 obviously comic motive in the punchline, but do not present a new object or
-event as something literally shown.""",
+event as something literally shown. Build the joke from a scene-specific contrast,
+understatement, or mock consequence. Never open with 'Behold', 'Witness', 'Look',
+or 'Groundbreaking news'; avoid 'thrilling', 'riveting', and generic claims that
+the subject is bored, heroic, or pretending.""",
     "humorous_tech": """Write like a burnt-out software engineer turning the
 visible scene into a clever bug report, deployment story, stack trace, API,
 queue, cache, rollback, or runtime joke. Keep at least one concrete subject,
 action or state, and setting detail from the video. Bold figurative debugging
 or workplace hyperbole is welcome; unsupported objects or events must not read
 as literal video facts. Use technical terms naturally, never as random jargon,
-and avoid empty phrases such as 'running runtime' or 'physical cache'.""",
+and avoid empty phrases such as 'running runtime' or 'physical cache'. Map one
+specific visible relationship to one apt software concept; avoid default 404,
+production crash, deployment, and legacy-code jokes unless the mapping is exact.""",
     "humorous_non_tech": """Write like an observant everyday comedian. Keep at
 least one concrete subject, action or state, and setting detail from the video,
 then make a funny, broadly relatable comparison or mini-scenario. Weekdays,
 snacks, chores, imagined attitudes, and social situations are allowed as an
 obvious punchline, not as literal claims. Use no technical jargon or niche
-references.""",
+references. Prefer a payoff uniquely suggested by the visible scene; avoid default
+Monday, chores, dinner, kitchen, snack, or 'same confidence as me' formulas.""",
 }
 
 _VERIFIED4_FINAL_PROMPT = """Perform one final image-grounded revision of the
@@ -255,13 +262,45 @@ PROPOSED CAPTIONS:
 {captions}
 """
 
+_VERIFIED6_PICK_PROMPT = """Select the single best candidate for each style.
+Judge independently on the same two axes as the external evaluator:
+1. accuracy to the chronological images and verified evidence; unsupported
+literal objects, actions, settings, counts, identities, or outcomes are a hard failure;
+2. strength and naturalness of the requested style. Sarcasm must be unmistakably
+dry; tech humor must contain a coherent joke rather than robotic substitutions;
+non-tech humor should have a relatable payoff that could make a person smile.
+
+Reject stock caption formulas. In particular, reject sarcastic openings such as
+"Behold", "Witness", "Look", or "Groundbreaking news", and reject empty claims
+that a scene is "thrilling" or "riveting". For tech humor, reject a generic 404,
+crash, deployment, or legacy-code joke unless the software concept maps precisely
+to the visible subject and action. For non-tech humor, prefer an analogy tailored
+to this scene over a default Monday, chores, dinner, kitchen, or snack joke.
+Do not reward invented emotions, occupations, motives, failures, or outcomes.
+Reject proper names, brands, institutions, and exact wording or numbers taken
+only from peripheral signs or markings. Such text is usable only when the same
+fact also appears in stable_facts; visible_text by itself is not enough.
+
+Prefer specific-and-true over vague-and-true, and prefer a clear style beat over
+a weak generic sentence. Do not reward length. Return each selected candidate
+verbatim; do not merge or rewrite. Return JSON only with exactly four string
+keys: formal, sarcastic, humorous_tech, humorous_non_tech.
+
+VERIFIED EVIDENCE:
+{evidence}
+
+CANDIDATES:
+{candidates}
+"""
+
 _TECH = {
-    "algorithm", "api", "bandwidth", "binary", "bug", "cache", "code",
-    "commit", "compile", "cpu", "database", "debug", "deploy", "download",
-    "gpu", "json", "kernel", "latency", "log", "network", "packet",
-    "pipeline", "program", "queue", "regex", "render", "repo", "rollback",
-    "runtime", "scheduler", "script", "server", "software", "thread",
-    "upload", "wifi",
+    "algorithm", "api", "balancer", "bandwidth", "binary", "bug", "cache",
+    "code", "commit", "compile", "cpu", "database", "debug", "deploy",
+    "deployment", "download", "endpoint", "gpu", "hotfix", "input", "interface",
+    "json", "kernel", "latency", "log", "memory", "middleware", "network", "packet",
+    "pipeline", "process", "program", "queue", "regex", "render", "repo",
+    "rollback", "runtime", "scheduler", "script", "server", "software", "stack",
+    "state", "thread", "ui", "upload", "wifi",
 }
 _SPECULATIVE = re.compile(
     r"\b(probably|likely|decid(?:e|es|ed|ing)|wants?|wanted|remembers?|pretends?|"
@@ -427,6 +466,35 @@ def _style_issues(style: str, caption: str) -> list[str]:
     return issues
 
 
+_STOCK_STYLE = {
+    "sarcastic": re.compile(
+        r"^(?:behold|witness|look\b)|groundbreaking news|\b(?:thrilling|riveting)\b|"
+        r"apparently this (?:perfectly )?ordinary scene",
+        re.I,
+    ),
+    "humorous_tech": re.compile(
+        r"\b404\b|motivation not found|legacy (?:codebase|process)|total system crash",
+        re.I,
+    ),
+    "humorous_non_tech": re.compile(
+        r"\b(?:on a |every )?monday\b|what (?:to|i should) (?:eat|have) for dinner|"
+        r"walked into the kitchen|finish all my chores|three different snacks|same confidence as me",
+        re.I,
+    ),
+}
+
+
+def _candidate_quality_issues(style: str, caption: str) -> list[str]:
+    issues = _style_issues(style, caption)
+    words = re.findall(r"\b[\w'-]+\b", caption)
+    if not 22 <= len(words) <= 45:
+        issues.append("candidate word count must be 22-45")
+    stock = _STOCK_STYLE.get(style)
+    if stock and stock.search(caption):
+        issues.append("stock style formula")
+    return issues
+
+
 def _parse_pair(raw: str) -> tuple[str, str]:
     match = re.search(r"CANDIDATE[_\s-]*A\s*:\s*(.*?)\s*CANDIDATE[_\s-]*B\s*:\s*(.*)$", raw, re.I | re.S)
     if not match:
@@ -583,6 +651,13 @@ def _four_anchor_frames(frames: list[Frame]) -> list[Frame]:
     return [frames[round(last * index / 3)] for index in range(4)]
 
 
+def _eight_anchor_frames(frames: list[Frame]) -> list[Frame]:
+    if len(frames) <= 8:
+        return frames
+    last = len(frames) - 1
+    return [frames[round(last * index / 7)] for index in range(8)]
+
+
 def _role_model_config(config: ProviderConfig, env_name: str, role: str) -> ProviderConfig:
     model = os.environ.get(env_name, "").strip() or config.model
     if "gemma" not in model.lower():
@@ -692,6 +767,41 @@ def _write_verified3_style(
     return _deterministic_verified_caption(style, evidence)
 
 
+def _write_verified7_pair(
+    style: str,
+    evidence: dict,
+    frames: list[Frame],
+    config: ProviderConfig,
+    deadline: float | None,
+) -> tuple[str, str]:
+    creative = style != "formal"
+    prompt = (
+        _VERIFIED3_STYLE_PROMPTS[style]
+        + "\n\nCreate TWO excellent alternatives for this one style. Candidate A should be polished, "
+        "literal-first, and highly reliable. Candidate B should use a different sentence shape and a sharper, "
+        "more original angle while remaining equally grounded. Both must retell the real clip: name the main "
+        "subject, setting, primary action or state, how it develops when supported, and at least two concrete "
+        "visible details. Aim for 30-38 words; hard bounds 22-45. "
+        + (
+            "An obviously figurative punchline may invent an attitude or relatable scenario, but no new object or event may read as literally shown. "
+            if creative
+            else "Every statement must remain objective, professional, and literally supported. "
+        )
+        + "Never mention frames, analysis, models, prompts, or captioning. "
+        "Never include proper names, brands, institutions, or exact wording or numbers from background signs and markings unless that same fact is explicitly present in stable_facts. "
+        "Output exactly:\nCANDIDATE_A: <caption>\nCANDIDATE_B: <caption>\n\nVERIFIED EVIDENCE:\n"
+        + json.dumps(evidence, ensure_ascii=False, indent=2)
+    )
+    raw = _call(
+        config,
+        _timeline_content(frames, prompt),
+        deadline=deadline,
+        max_tokens=520,
+        temperature=0.3 if style == "formal" else 0.88,
+    )
+    return _parse_pair(raw)
+
+
 def _deterministic_verified_caption(style: str, evidence: dict) -> str:
     anchor = _normalize_anchor(str(evidence.get("caption_anchor", "")))
     if not anchor:
@@ -788,6 +898,99 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
     return captions
 
 
+def _caption_clip_verified7(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
+    anchors = _eight_anchor_frames(frames)
+    try:
+        draft_raw = _call(
+            config,
+            _timeline_content(anchors, _VERIFIED3_DRAFT_PROMPT),
+            deadline=deadline,
+            max_tokens=800,
+            temperature=0.1,
+        )
+        draft = _parse_verified_evidence(draft_raw)
+    except Exception as error:
+        _log(f"verified7 evidence stage failed; using direct grounded generation: {error}")
+        return _caption_clip_fast(_four_anchor_frames(anchors), task_id, config, deadline)
+    verify_config = _verify_model_config(config)
+    evidence = draft
+    try:
+        review_prompt = _VERIFIED3_REVIEW_PROMPT + json.dumps(draft, ensure_ascii=False, indent=2)
+        verified_raw = _call(
+            verify_config,
+            _timeline_content(anchors[:6], review_prompt),
+            deadline=deadline,
+            max_tokens=800,
+            temperature=0.05,
+        )
+        evidence = _parse_verified_evidence(verified_raw)
+    except Exception as error:
+        _log(f"verified7 evidence review skipped: {error}")
+
+    caption_config = _caption_model_config(config)
+    style_frames = _four_anchor_frames(anchors)
+    candidates: dict[str, list[str]] = {}
+    for style in STYLES:
+        try:
+            pair = _write_verified7_pair(style, evidence, style_frames, caption_config, deadline)
+            candidates[style] = [pair[0], pair[1]]
+        except Exception as error:
+            _log(f"verified7 {style} pair unavailable: {error}")
+            try:
+                single = _write_verified3_style(style, evidence, [], caption_config, deadline, style_frames)
+            except Exception as fallback_error:
+                _log(f"verified7 {style} single fallback unavailable: {fallback_error}")
+                single = _deterministic_verified_caption(style, evidence)
+            backup = _deterministic_verified_caption(style, evidence)
+            candidates[style] = [single, backup if backup.casefold() != single.casefold() else single]
+
+    pick_prompt = _VERIFIED6_PICK_PROMPT.format(
+        evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
+        candidates=json.dumps(candidates, ensure_ascii=False, indent=2),
+    )
+    try:
+        picked_raw = _call(
+            verify_config,
+            _timeline_content(anchors[:6], pick_prompt),
+            deadline=deadline,
+            max_tokens=900,
+            temperature=0.0,
+        )
+        picked = _parse_fast(picked_raw)
+        captions: dict[str, str] = {}
+        for style in STYLES:
+            matches = [
+                index for index, candidate in enumerate(candidates[style])
+                if candidate.casefold() == picked[style].casefold()
+            ]
+            if not matches:
+                raise EvidencePipelineError(f"verified7 picker rewrote the {style} candidate")
+            chosen = matches[0]
+            alternate = 1 - chosen
+            if len(_candidate_quality_issues(style, candidates[style][alternate])) < len(
+                _candidate_quality_issues(style, candidates[style][chosen])
+            ):
+                chosen = alternate
+            captions[style] = candidates[style][chosen]
+    except Exception as error:
+        _log(f"verified7 visual picker skipped: {type(error).__name__}: {error!r}")
+        captions = {
+            style: min(candidates[style], key=lambda value: len(_candidate_quality_issues(style, value)))
+            for style in STYLES
+        }
+    _write_trace(
+        task_id,
+        {
+            "mode": "verified7-pairs-picker",
+            "evidence": evidence,
+            "candidates": candidates,
+            "captions": captions,
+            "issues": _caption_batch_issues(captions),
+        },
+    )
+    return captions
+
+
 def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str] = None, timeout_s: Optional[float] = None) -> dict[str, str]:
     if not frames:
         raise EvidencePipelineError(f"no frames available for {task_id}")
@@ -802,6 +1005,8 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
         raise EvidencePipelineError("Novita-only mode requires an allowed Gemma 4 31B or Gemma 3 27B model")
     _log(f"evidence: Gemma model={config.model} task={task_id}")
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
+    if pipeline in {"verified7", "verified-7", "pairs-picker"}:
+        return _caption_clip_verified7(frames, task_id, config, deadline)
     if pipeline in {
         "verified3", "verified-3", "verified-sequential",
         "verified4", "verified-4", "champion",

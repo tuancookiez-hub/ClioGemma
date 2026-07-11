@@ -10,6 +10,8 @@ from app.core.provider import ProviderError, provider_config
 from app.evidence_pipeline import (
     _caption_batch_issues,
     _caption_model_config,
+    _candidate_quality_issues,
+    _eight_anchor_frames,
     _four_anchor_frames,
     _parse_verified_evidence,
     _normalize,
@@ -66,6 +68,14 @@ def test_provider_retry_policy_is_bounded() -> None:
 
 def test_verified_evidence_parser_and_style_guard() -> None:
     assert _normalize("**deployment** via `queue`") == "deployment via queue"
+    assert "stock style formula" in _candidate_quality_issues(
+        "sarcastic",
+        "Behold the thrilling spectacle of cars moving through a city road past yellow trees and tall apartment buildings in the background.",
+    )
+    assert "stock style formula" not in _candidate_quality_issues(
+        "sarcastic",
+        "Cars file past yellow trees and apartment towers, maintaining the solemn urban tradition of moving three metres before reconsidering every life choice.",
+    )
     evidence = _parse_verified_evidence(
         '```json\n{"scene":"street","subjects":["train"],'
         '"stable_facts":["a train is visible","tracks are visible"],'
@@ -88,6 +98,7 @@ def test_verified3_uses_first_middle_last_and_gemma_caption_model(monkeypatch: p
     frames = [Frame(tmp_path / f"{index}.jpg", index, float(index)) for index in range(5)]
     assert [frame.index for frame in _three_anchor_frames(frames)] == [0, 2, 4]
     assert [frame.index for frame in _four_anchor_frames(frames)] == [0, 1, 3, 4]
+    assert [frame.index for frame in _eight_anchor_frames(frames)] == [0, 1, 2, 3, 4]
     monkeypatch.setenv("CLIO_ENFORCE_NOVITA", "1")
     monkeypatch.setenv("CLIO_CAPTION_MODEL", "google/gemma-4-31b-it")
     monkeypatch.setenv("CLIO_VERIFY_MODEL", "google/gemma-4-31b-it")
