@@ -122,7 +122,8 @@ those errors, but no local judge can certify a hidden score.
   timestamp, and returned leaderboard score. Change one variable at a time.
 
 Suggested submission ladder: start with the verified Gemma 3 27B/5-frame
-release; then test Gemma 3 27B with 4 and 8 anchors. Test Gemma 4 31B only as
+release; then test a separate Gemma 3 27B/3-frame tag inspired by the public
+ProVision image, followed by 4 and 8 anchors. Test Gemma 4 31B only as
 a single-call A/B image and keep it only if its measured request latency stays
 under the guide's 30-second request limit. Do not submit the timed-out
 multi-pass evidence path.
