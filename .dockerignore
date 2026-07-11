@@ -1,0 +1,9 @@
+.git
+__pycache__
+*.pyc
+tests
+scripts
+docs
+benchmarks
+scratch
+demo
