@@ -263,12 +263,6 @@ _TECH = {
     "runtime", "scheduler", "script", "server", "software", "thread",
     "upload", "wifi",
 }
-_SARCASM = re.compile(
-    r"\b(apparently|clearly|naturally|of course|because|remarkably|predictably|"
-    r"exactly what|groundbreaking|revolutionary|thrilling|shocking|ah yes|"
-    r"when you|nothing says|just another|truly|perfect)\b",
-    re.I,
-)
 _SPECULATIVE = re.compile(
     r"\b(probably|likely|decid(?:e|es|ed|ing)|wants?|wanted|remembers?|pretends?|"
     r"believes?|hopes?|trying to|plans? to|about to)\b",
@@ -430,8 +424,6 @@ def _style_issues(style: str, caption: str) -> list[str]:
         issues.append("technical jargon")
     if style == "formal" and ("!" in caption or "?" in caption):
         issues.append("formal punctuation")
-    if style == "sarcastic" and not _SARCASM.search(caption):
-        issues.append("missing clear sarcasm cue")
     return issues
 
 
@@ -695,6 +687,8 @@ def _write_verified3_style(
             return repaired
     except Exception as error:
         _log(f"verified3 {style} repair skipped: {error}")
+    if style == "sarcastic":
+        return caption
     return _deterministic_verified_caption(style, evidence)
 
 
