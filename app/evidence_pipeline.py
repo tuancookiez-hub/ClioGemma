@@ -139,19 +139,152 @@ Return JSON only. Either use four string keys named formal, sarcastic,
 humorous_tech, humorous_non_tech, or use a captions array with objects having
 style and text fields. Do not include reasoning or Markdown."""
 
-_TECH = {
-    "algorithm", "api", "bandwidth", "binary", "cache", "code", "commit",
-    "compile", "cpu", "database", "debug", "deploy", "download", "gpu",
-    "json", "kernel", "latency", "network", "packet", "program", "regex",
-    "render", "repo", "runtime", "script", "server", "software", "upload",
-    "wifi",
+_VERIFIED_EVIDENCE_PROMPT = """You are the factual evidence stage of a video
+captioning system. Inspect the three chronological labelled images. First check
+the complete sequence internally, then return one conservative JSON object:
+{
+  "scene": "one short factual setting description",
+  "subjects": ["generic visible subject descriptions"],
+  "stable_facts": ["facts visibly supported by at least one image"],
+  "timeline": ["beginning: ...", "middle: ...", "end: ..."],
+  "visible_text": ["only large central text that is unquestionably readable"],
+  "do_not_claim": ["ambiguous actions, motives, identities, counts, brands, or locations"]
 }
-_SPECULATIVE = re.compile(
-    r"\b(probably|likely|decides?|wants?|remembers?|pretends?|believes?|hopes?|trying to|plans? to|about to)\b",
+Use generic descriptions when identity or location is uncertain. A hand near an
+object does not prove writing, opening, closing, eating, drinking, or completion.
+Do not infer audio, speech, motive, emotion, relationship, future action, or an
+event between images. Distinguish subject motion from camera motion. Output JSON
+only, without markdown or analysis."""
+
+_VERIFIED_CAPTION_PROMPT = """Write exactly four captions from the verified
+evidence below. The evidence is a hard factual ceiling: no caption may add an
+object, action, identity, relationship, location, count, motive, emotion,
+completed event, future event, or readable text that is absent from it.
+
+Start every caption with the central visible subject/action/state. Keep each
+caption 18-34 words and natural. The joke may change tone but may not introduce
+a second event or backstory.
+
+formal: one objective professional sentence, no humor.
+sarcastic: an accurate literal clause followed by dry irony about that same
+visible situation; no rhetorical question and no invented people or motive.
+humorous_tech: one accurate literal clause followed by exactly one simple
+software or technology analogy tied to the visible action; never discuss image
+quality, cameras, JPEGs, frames, models, prompts, or computer vision.
+humorous_non_tech: one accurate literal clause followed by one relatable
+everyday comparison; no technology jargon, invented people, weekdays, chores,
+or unseen backstory.
+
+Return JSON only with exactly these four string keys: formal, sarcastic,
+humorous_tech, humorous_non_tech.
+
+VERIFIED EVIDENCE:
+"""
+
+_VERIFIED3_DRAFT_PROMPT = """Inspect the chronological images as one
+short video. Return a conservative JSON evidence record with exactly these
+keys:
+{
+  "scene": "specific visible setting, or a generic setting when uncertain",
+  "subjects": ["generic visible subjects and objects"],
+  "stable_facts": ["concrete facts directly supported by the images"],
+  "timeline": ["beginning: ...", "middle: ...", "end: ..."],
+  "caption_anchor": "one complete present-tense sentence of 6-14 words stating one conservative main action or state; capitalize it; do not join two actions with and",
+  "visible_text": ["only large, central, unquestionably readable text"],
+  "do_not_claim": ["plausible but unsupported identities, actions, counts, motives, relationships, brands, locations, audio, or outcomes"]
+}
+Be specific about the central visible action or state, but conservative about
+what happens between images. A nearby hand does not prove writing, opening,
+closing, eating, drinking, or completion. Distinguish camera motion from
+subject motion. Output JSON only."""
+
+_VERIFIED3_REVIEW_PROMPT = """Act as a strict second visual observer. Compare
+the draft evidence record below against the chronological images. Remove
+or correct every unsupported detail. Preserve useful specificity when it is
+clearly visible. Put ambiguous identities, relationships, brands, locations,
+exact counts, motives, emotions, audio, inferred actions, and unseen outcomes
+in do_not_claim. Return the same exact JSON schema and nothing else.
+
+DRAFT EVIDENCE:
+"""
+
+_VERIFIED3_STYLE_PROMPTS = {
+    "formal": """Write a polished formal caption. State the main visible
+subject, setting, and action or state in one objective sentence. Use concrete
+details from the verified evidence, with no joke, slang, flourish, or
+speculation.""",
+    "sarcastic": """Write with the voice of a weary, sharp observer forced to
+narrate the obvious. Make the sarcasm unmistakable, dry, and genuinely witty,
+not merely a formal caption with 'apparently' added. Include a concrete visible
+subject, action or state, and detail. You may personify the subject or invent an
+obviously comic motive in the punchline, but do not present a new object or
+event as something literally shown.""",
+    "humorous_tech": """Write like a burnt-out software engineer turning the
+visible scene into a clever bug report, deployment story, stack trace, API,
+queue, cache, rollback, or runtime joke. Keep at least one concrete subject,
+action or state, and setting detail from the video. Bold figurative debugging
+or workplace hyperbole is welcome; unsupported objects or events must not read
+as literal video facts. Use technical terms naturally, never as random jargon,
+and avoid empty phrases such as 'running runtime' or 'physical cache'.""",
+    "humorous_non_tech": """Write like an observant everyday comedian. Keep at
+least one concrete subject, action or state, and setting detail from the video,
+then make a funny, broadly relatable comparison or mini-scenario. Weekdays,
+snacks, chores, imagined attitudes, and social situations are allowed as an
+obvious punchline, not as literal claims. Use no technical jargon or niche
+references.""",
+}
+
+_VERIFIED4_FINAL_PROMPT = """Perform one final image-grounded revision of the
+four proposed captions. The chronological images and verified evidence are the
+only factual sources. Preserve each requested tone, but remove or correct any
+literal object, action, identity, relationship, setting, count, motive,
+emotion, text, arrival, departure, completion, or outcome not directly
+supported. The formal caption must remain literal and begin with caption_anchor.
+For creative captions, preserve at least one concrete subject, action or state,
+and setting detail, but keep bold sarcasm and humor. Do not remove an obviously
+figurative joke merely because it mentions a motive, weekday, snack, debugging,
+deployment, or imagined situation. Correct only unsupported details that read
+as literal video facts. Keep each caption concise and strongly differentiated.
+Return JSON only with exactly these four string keys:
+formal, sarcastic, humorous_tech, humorous_non_tech.
+
+VERIFIED EVIDENCE:
+{evidence}
+
+PROPOSED CAPTIONS:
+{captions}
+"""
+
+_TECH = {
+    "algorithm", "api", "bandwidth", "binary", "bug", "cache", "code",
+    "commit", "compile", "cpu", "database", "debug", "deploy", "download",
+    "gpu", "json", "kernel", "latency", "log", "network", "packet",
+    "pipeline", "program", "queue", "regex", "render", "repo", "rollback",
+    "runtime", "scheduler", "script", "server", "software", "thread",
+    "upload", "wifi",
+}
+_SARCASM = re.compile(
+    r"\b(apparently|clearly|naturally|of course|because|remarkably|predictably|"
+    r"exactly what|groundbreaking|revolutionary|thrilling|shocking|ah yes|"
+    r"when you|nothing says|just another|truly|perfect)\b",
     re.I,
 )
-_PROCESS = re.compile(r"\b(frames?|sampling|model|prompt|analysis|detection|uncertain(?:ty)?)\b", re.I)
-_RELATIONSHIP = re.compile(r"\b(family|mother|father|parent|sibling|owner|coworker|colleague|couple|husband|wife|daughter|son)\b", re.I)
+_SPECULATIVE = re.compile(
+    r"\b(probably|likely|decid(?:e|es|ed|ing)|wants?|wanted|remembers?|pretends?|"
+    r"believes?|hopes?|trying to|plans? to|about to)\b",
+    re.I,
+)
+_PROCESS = re.compile(
+    r"\b(frames?|sampling|model|prompt|analysis|detection|uncertain(?:ty)?|"
+    r"image quality|jpe?g|pixels?|camera footage|computer vision)\b",
+    re.I,
+)
+_RELATIONSHIP = re.compile(
+    r"\b(famil(?:y|ies)|mothers?|fathers?|parents?|siblings?|owners?|"
+    r"coworkers?|colleagues?|couples?|husbands?|wives|daughters?|sons?|kids?)\b",
+    re.I,
+)
+_AWKWARD_TECH = re.compile(r"\b(running runtime|physical cache|sign (?:as|is) an api|scheduler scheduling)\b", re.I)
 _DURATION = re.compile(r"\b\d+(?:\.\d+)?\s+(?:seconds?|minutes?|hours?)\b", re.I)
 
 
@@ -169,7 +302,13 @@ def _timeout(config: ProviderConfig, deadline: float | None) -> float:
 
 def _retryable_status(error: Exception) -> int | None:
     status = getattr(error, "status_code", None)
-    return status if status in {429, 500, 502, 503, 504} else None
+    if status in {408, 429, 500, 502, 503, 504}:
+        return status
+    name = type(error).__name__.lower()
+    message = str(error).lower()
+    if "timeout" in name or "timed out" in message:
+        return 408
+    return None
 
 
 def _retry_delay(attempt: int) -> float:
@@ -195,7 +334,7 @@ def _call(config: ProviderConfig, content: list[dict], *, deadline: float | None
             break
         except Exception as error:
             status = _retryable_status(error)
-            if status is None or attempt >= retries:
+            if status is None or attempt >= retries or (status == 408 and attempt >= 1):
                 raise
             delay = _retry_delay(attempt)
             left = _remaining(deadline)
@@ -227,31 +366,72 @@ def _normalize(raw: str) -> str:
     fenced = re.search(r"```(?:text|markdown)?\s*(.*?)```", text, re.I | re.S)
     if fenced:
         text = fenced.group(1).strip()
+    text = re.sub(r"(?:\*\*|__|`)", "", text)
     return re.sub(r"\s+", " ", text).strip(" \t\"'")
+
+
+def _normalize_anchor(raw: str) -> str:
+    anchor = _normalize(raw).strip()
+    if not anchor:
+        return ""
+    anchor = anchor.rstrip(".?!")
+    if anchor.isupper():
+        anchor = anchor.lower()
+    if anchor and anchor[0].isalpha():
+        anchor = anchor[0].upper() + anchor[1:]
+    return anchor
+
+
+_ANCHOR_STOP = {
+    "a", "an", "and", "are", "at", "by", "for", "from", "in", "is",
+    "of", "on", "the", "through", "to", "with",
+}
+
+
+def _anchor_style_issues(style: str, caption: str, anchor: str) -> list[str]:
+    anchor = _normalize_anchor(anchor)
+    if not anchor:
+        return []
+    normalized_caption = _normalize(caption)
+    if style == "formal":
+        if not normalized_caption.casefold().startswith(anchor.casefold()):
+            return ["formal caption must begin with the verified factual anchor"]
+        return []
+    anchor_tokens = {
+        token.rstrip("s")
+        for token in re.findall(r"[a-z]+", anchor.casefold())
+        if token not in _ANCHOR_STOP and len(token) > 2
+    }
+    caption_tokens = {token.rstrip("s") for token in re.findall(r"[a-z]+", normalized_caption.casefold())}
+    if anchor_tokens and not anchor_tokens & caption_tokens:
+        return ["creative caption must retain a concrete detail from the verified anchor"]
+    return []
 
 
 def _style_issues(style: str, caption: str) -> list[str]:
     words = re.findall(r"\b[\w'-]+\b", caption)
     issues: list[str] = []
-    if not 18 <= len(words) <= 42:
-        issues.append("word count must be 18-42")
+    if not 12 <= len(words) <= 50:
+        issues.append("word count must be 12-50")
     if _PROCESS.search(caption):
         issues.append("process leakage")
-    if _SPECULATIVE.search(caption):
+    if style == "formal" and _SPECULATIVE.search(caption):
         issues.append("speculative intent")
-    if _RELATIONSHIP.search(caption):
+    if style == "formal" and _RELATIONSHIP.search(caption):
         issues.append("inferred relationship")
-    if _DURATION.search(caption):
+    if style == "formal" and _DURATION.search(caption):
         issues.append("precise duration")
     hits = {word for word in _TECH if re.search(rf"\b{re.escape(word)}s?\b", caption, re.I)}
     if style == "humorous_tech" and not hits:
         issues.append("missing tech comparison")
+    if style == "humorous_tech" and _AWKWARD_TECH.search(caption):
+        issues.append("awkward or incorrect tech analogy")
     if style == "humorous_non_tech" and hits:
         issues.append("technical jargon")
     if style == "formal" and ("!" in caption or "?" in caption):
         issues.append("formal punctuation")
-    if style == "sarcastic" and "!" in caption:
-        issues.append("sarcasm exclamation")
+    if style == "sarcastic" and not _SARCASM.search(caption):
+        issues.append("missing clear sarcasm cue")
     return issues
 
 
@@ -306,10 +486,311 @@ def _parse_fast(raw: str) -> dict[str, str]:
     raise EvidencePipelineError("fast Gemma call returned the wrong caption schema")
 
 
+def _parse_verified_evidence(raw: str) -> dict:
+    text = raw.strip()
+    fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.I | re.S)
+    if fenced:
+        text = fenced.group(1).strip()
+    match = re.search(r"\{.*\}", text, re.S)
+    if not match:
+        raise EvidencePipelineError("verified evidence call returned no JSON")
+    data = json.loads(match.group(0))
+    if not isinstance(data, dict):
+        raise EvidencePipelineError("verified evidence was not an object")
+    stable = data.get("stable_facts")
+    timeline = data.get("timeline")
+    if not isinstance(stable, list) or not stable:
+        raise EvidencePipelineError("verified evidence lacks stable facts")
+    if not isinstance(timeline, list) or not timeline:
+        raise EvidencePipelineError("verified evidence lacks a timeline")
+    anchor = _normalize_anchor(str(data.get("caption_anchor", "")))
+    if anchor:
+        data["caption_anchor"] = anchor + "."
+    return data
+
+
+def _caption_batch_issues(captions: dict[str, str], anchor: str = "") -> dict[str, list[str]]:
+    issues = {style: _style_issues(style, captions.get(style, "")) for style in STYLES}
+    anchor = _normalize_anchor(anchor)
+    if anchor:
+        for style in STYLES:
+            issues[style].extend(_anchor_style_issues(style, captions.get(style, ""), anchor))
+    normalized = [re.sub(r"\W+", " ", captions.get(style, "").lower()).strip() for style in STYLES]
+    if len(set(normalized)) != len(normalized):
+        for style in STYLES:
+            issues[style].append("caption duplicates another style")
+    return {style: values for style, values in issues.items() if values}
+
+
+def _issue_count(issues: dict[str, list[str]]) -> int:
+    return sum(len(values) for values in issues.values())
+
+
 def _caption_clip_fast(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
     raw = _call(config, _timeline_content(frames, _FAST_PROMPT), deadline=deadline, max_tokens=1200, temperature=0.25)
     captions = _parse_fast(raw)
     _write_trace(task_id, {"mode": "fast", "captions": captions})
+    return captions
+
+
+def _caption_clip_verified2(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
+    evidence_raw = _call(
+        config,
+        _timeline_content(frames[:3], _VERIFIED_EVIDENCE_PROMPT),
+        deadline=deadline,
+        max_tokens=700,
+        temperature=0.1,
+    )
+    evidence = _parse_verified_evidence(evidence_raw)
+    caption_prompt = _VERIFIED_CAPTION_PROMPT + json.dumps(evidence, ensure_ascii=False, indent=2)
+    caption_raw = _call(
+        config,
+        [{"type": "text", "text": caption_prompt}],
+        deadline=deadline,
+        max_tokens=900,
+        temperature=0.4,
+    )
+    captions = _parse_fast(caption_raw)
+    issues = _caption_batch_issues(captions)
+    if issues:
+        repair_prompt = (
+            caption_prompt
+            + "\n\nThe previous captions failed deterministic checks:\n"
+            + json.dumps(issues, ensure_ascii=False)
+            + "\nRewrite all four captions. Correct only the listed failures while preserving the verified facts. "
+            "Return the same exact four-key JSON object.\n\nPREVIOUS CAPTIONS:\n"
+            + json.dumps(captions, ensure_ascii=False, indent=2)
+        )
+        try:
+            repaired_raw = _call(
+                config,
+                [{"type": "text", "text": repair_prompt}],
+                deadline=deadline,
+                max_tokens=900,
+                temperature=0.25,
+            )
+            repaired = _parse_fast(repaired_raw)
+            if len(_caption_batch_issues(repaired)) <= len(issues):
+                captions = repaired
+        except Exception as error:
+            _log(f"verified2 repair skipped: {error}")
+    _write_trace(task_id, {"mode": "verified2", "evidence": evidence, "captions": captions})
+    return captions
+
+
+def _three_anchor_frames(frames: list[Frame]) -> list[Frame]:
+    if len(frames) <= 3:
+        return frames
+    return [frames[0], frames[len(frames) // 2], frames[-1]]
+
+
+def _four_anchor_frames(frames: list[Frame]) -> list[Frame]:
+    if len(frames) <= 4:
+        return frames
+    last = len(frames) - 1
+    return [frames[round(last * index / 3)] for index in range(4)]
+
+
+def _role_model_config(config: ProviderConfig, env_name: str, role: str) -> ProviderConfig:
+    model = os.environ.get(env_name, "").strip() or config.model
+    if "gemma" not in model.lower():
+        raise EvidencePipelineError(f"{role} model must be Gemma-family")
+    enforce = os.environ.get("CLIO_ENFORCE_NOVITA", "").lower() in {"1", "true", "yes"}
+    if enforce and model.lower() not in {item.lower() for item in NOVITA_GEMMA_MODELS}:
+        raise EvidencePipelineError(f"Novita-only {role} model must be an allowed Gemma model")
+    return replace(config, model=model)
+
+
+def _caption_model_config(config: ProviderConfig) -> ProviderConfig:
+    return _role_model_config(config, "CLIO_CAPTION_MODEL", "caption")
+
+
+def _verify_model_config(config: ProviderConfig) -> ProviderConfig:
+    return _role_model_config(config, "CLIO_VERIFY_MODEL", "verification")
+
+
+def _write_verified3_style(
+    style: str,
+    evidence: dict,
+    prior_captions: list[str],
+    config: ProviderConfig,
+    deadline: float | None,
+    frames: list[Frame] | None = None,
+) -> str:
+    anchor = _normalize_anchor(str(evidence.get("caption_anchor", "")))
+    prior_note = ""
+    if prior_captions:
+        prior_note = (
+            "\n\nCaptions already written for this clip:\n- "
+            + "\n- ".join(prior_captions)
+            + "\nUse a different sentence shape and comedic angle while preserving the same visible facts."
+        )
+    anchor_note = ""
+    if anchor and style == "formal":
+        anchor_note = (
+            "\n\nBegin with this exact verified factual clause, unchanged: "
+            + anchor
+            + "."
+        )
+    elif anchor:
+        anchor_note = (
+            "\n\nNaturally retain the central visual fact in this verified anchor: "
+            + anchor
+            + ". Do not copy the formal sentence word for word."
+        )
+    creative_rule = (
+        "The verified evidence is a hard ceiling for literal claims. An obviously figurative creative punchline may "
+        "invent an attitude or relatable scenario, but the caption must still name a real visible detail. "
+        if style != "formal"
+        else "The verified evidence is a hard ceiling; every statement must be literal and supported. "
+    )
+    length_rule = "Write 18-48 words" if style == "formal" else "Write 12-40 words"
+    prompt = (
+        _VERIFIED3_STYLE_PROMPTS[style]
+        + "\n\n"
+        + creative_rule
+        + length_rule
+        + ", use one or two concise sentences, never mention frames or analysis, and output only the caption text."
+        + anchor_note
+        + prior_note
+        + "\n\nVERIFIED EVIDENCE:\n"
+        + json.dumps(evidence, ensure_ascii=False, indent=2)
+    )
+    persona_mode = bool(frames)
+    temperature = 0.2 if style == "formal" else (0.82 if persona_mode else 0.7)
+    content = _timeline_content(frames, prompt) if frames else [{"type": "text", "text": prompt}]
+    caption = _normalize(
+        _call(
+            config,
+            content,
+            deadline=deadline,
+            max_tokens=240,
+            temperature=temperature,
+        )
+    )
+    issues = _style_issues(style, caption)
+    issues.extend(_anchor_style_issues(style, caption, anchor))
+    if not issues:
+        return caption
+    repair_prompt = (
+        prompt
+        + "\n\nYour previous caption failed these mechanical checks: "
+        + "; ".join(issues)
+        + ". Rewrite it without adding facts. Output only the corrected caption.\n\nPREVIOUS CAPTION:\n"
+        + caption
+    )
+    try:
+        repaired = _normalize(
+            _call(
+                config,
+                _timeline_content(frames, repair_prompt) if frames else [{"type": "text", "text": repair_prompt}],
+                deadline=deadline,
+                max_tokens=240,
+                temperature=0.25,
+            )
+        )
+        repaired_issues = _style_issues(style, repaired)
+        repaired_issues.extend(_anchor_style_issues(style, repaired, anchor))
+        if len(repaired_issues) < len(issues):
+            return repaired
+    except Exception as error:
+        _log(f"verified3 {style} repair skipped: {error}")
+    return _deterministic_verified_caption(style, evidence)
+
+
+def _deterministic_verified_caption(style: str, evidence: dict) -> str:
+    anchor = _normalize_anchor(str(evidence.get("caption_anchor", "")))
+    if not anchor:
+        anchor = _normalize(str(evidence.get("scene", "The main subject remains visible"))).rstrip(".?!")
+    endings = {
+        "formal": "in the visible setting, with the surrounding details remaining clearly observable.",
+        "sarcastic": "and apparently this perfectly ordinary scene has appointed itself the most important event of the day.",
+        "humorous_tech": "like a legacy process nobody wants to debug but everyone is afraid to stop.",
+        "humorous_non_tech": "with the unmistakable energy of a weekday task everyone hoped somebody else would handle.",
+    }
+    return f"{anchor}, {endings[style]}"
+
+
+def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
+    pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
+    persona_mode = pipeline in {"verified5", "verified-5", "persona", "persona-grounded"}
+    anchors = _four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames)
+    try:
+        draft_raw = _call(
+            config,
+            _timeline_content(anchors, _VERIFIED3_DRAFT_PROMPT),
+            deadline=deadline,
+            max_tokens=650,
+            temperature=0.15,
+        )
+        draft = _parse_verified_evidence(draft_raw)
+    except Exception as error:
+        _log(f"verified3 evidence stage failed; using direct grounded generation: {error}")
+        return _caption_clip_fast(anchors, task_id, config, deadline)
+    review_prompt = _VERIFIED3_REVIEW_PROMPT + json.dumps(draft, ensure_ascii=False, indent=2)
+    verify_config = _verify_model_config(config)
+    try:
+        verified_raw = _call(
+            verify_config,
+            _timeline_content(anchors, review_prompt),
+            deadline=deadline,
+            max_tokens=650,
+            temperature=0.05,
+        )
+        evidence = _parse_verified_evidence(verified_raw)
+    except Exception as error:
+        _log(f"verified3 second observer unavailable; retaining first evidence record: {error}")
+        evidence = draft
+    caption_config = _caption_model_config(config)
+    captions: dict[str, str] = {}
+    prior: list[str] = []
+    for style in STYLES:
+        try:
+            caption = _write_verified3_style(
+                style,
+                evidence,
+                prior,
+                caption_config,
+                deadline,
+                anchors if persona_mode else None,
+            )
+        except Exception as error:
+            _log(f"verified3 {style} writer unavailable; using evidence-bound local caption: {error}")
+            caption = _deterministic_verified_caption(style, evidence)
+        captions[style] = caption
+        prior.append(caption)
+    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "persona", "persona-grounded"}:
+        final_prompt = _VERIFIED4_FINAL_PROMPT.format(
+            evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
+            captions=json.dumps(captions, ensure_ascii=False, indent=2),
+        )
+        try:
+            reviewed_raw = _call(
+                verify_config,
+                _timeline_content(anchors, final_prompt),
+                deadline=deadline,
+                max_tokens=900,
+                temperature=0.1,
+            )
+            reviewed = _parse_fast(reviewed_raw)
+            anchor = str(evidence.get("caption_anchor", ""))
+            if _issue_count(_caption_batch_issues(reviewed, anchor)) <= _issue_count(_caption_batch_issues(captions, anchor)):
+                captions = reviewed
+        except Exception as error:
+            _log(f"verified4 final grounding revision skipped: {error}")
+    _write_trace(
+        task_id,
+        {
+            "mode": pipeline or "verified3",
+            "vision_model": config.model,
+            "verification_model": verify_config.model,
+            "caption_model": caption_config.model,
+            "draft": draft,
+            "evidence": evidence,
+            "captions": captions,
+            "issues": _caption_batch_issues(captions, str(evidence.get("caption_anchor", ""))),
+        },
+    )
     return captions
 
 
@@ -326,6 +807,15 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
     if enforce and ("novita.ai" not in config.base_url.lower() or config.model.lower() not in {m.lower() for m in NOVITA_GEMMA_MODELS}):
         raise EvidencePipelineError("Novita-only mode requires an allowed Gemma 4 31B or Gemma 3 27B model")
     _log(f"evidence: Gemma model={config.model} task={task_id}")
+    pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
+    if pipeline in {
+        "verified3", "verified-3", "verified-sequential",
+        "verified4", "verified-4", "champion",
+        "verified5", "verified-5", "persona", "persona-grounded",
+    }:
+        return _caption_clip_verified3(frames, task_id, config, deadline)
+    if pipeline in {"verified2", "verified-2", "two-stage"}:
+        return _caption_clip_verified2(frames, task_id, config, deadline)
     if os.environ.get("CLIO_FAST_MODE", "").lower() in {"1", "true", "yes"}:
         return _caption_clip_fast(frames, task_id, config, deadline)
 
