@@ -60,7 +60,7 @@ def run_task_combined(video_url: str, task_id: str, styles: list[str], out_dir: 
 def runtime_config() -> tuple[float, float, int]:
     hard = min(float(os.environ.get("SWIFTCLIP_DEADLINE_S", "570")), 570.0)
     per_clip = min(float(os.environ.get("SWIFTCLIP_CLIP_TIMEOUT", "125")), hard)
-    parallel = min(int(os.environ.get("SWIFTCLIP_PARALLEL", "3")), 8)
+    parallel = min(int(os.environ.get("SWIFTCLIP_PARALLEL", "2")), 8)
     if hard <= 0 or per_clip <= 0 or parallel <= 0:
         raise ValueError("runtime values must be positive")
     return hard, per_clip, parallel

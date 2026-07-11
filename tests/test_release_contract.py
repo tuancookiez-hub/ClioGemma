@@ -7,6 +7,7 @@ import pytest
 
 from app.core.parse import STYLES, parse_styles
 from app.core.provider import ProviderError, provider_config
+from app.evidence_pipeline import _retry_delay, _retryable_status
 from app.visual import run
 
 
@@ -33,3 +34,15 @@ def test_runner_writes_schema_when_task_has_no_url(tmp_path: Path) -> None:
     rows = json.loads(output_path.read_text(encoding="utf-8"))
     assert rows[0]["task_id"] == "t1"
     assert set(rows[0]["captions"]) == set(STYLES)
+
+
+def test_provider_retry_policy_is_bounded() -> None:
+    class RateLimitError(Exception):
+        status_code = 429
+
+    class BadRequestError(Exception):
+        status_code = 400
+
+    assert _retryable_status(RateLimitError()) == 429
+    assert _retryable_status(BadRequestError()) is None
+    assert [_retry_delay(index) for index in range(5)] == [1.5, 3.0, 6.0, 6.0, 6.0]

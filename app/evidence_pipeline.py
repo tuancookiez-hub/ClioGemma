@@ -167,16 +167,42 @@ def _timeout(config: ProviderConfig, deadline: float | None) -> float:
     return value
 
 
+def _retryable_status(error: Exception) -> int | None:
+    status = getattr(error, "status_code", None)
+    return status if status in {429, 500, 502, 503, 504} else None
+
+
+def _retry_delay(attempt: int) -> float:
+    return min(1.5 * (2 ** attempt), 6.0)
+
+
 def _call(config: ProviderConfig, content: list[dict], *, deadline: float | None, max_tokens: int, temperature: float) -> str:
-    timeout = _timeout(config, deadline)
-    client = OpenAI(api_key=config.api_key, base_url=config.base_url, timeout=timeout, max_retries=1)
-    response = client.chat.completions.create(
-        model=config.model,
-        messages=[{"role": "user", "content": content}],
-        max_tokens=max_tokens,
-        temperature=temperature,
-        timeout=timeout,
-    )
+    try:
+        retries = max(0, min(int(os.environ.get("CLIO_RATE_LIMIT_RETRIES", "3")), 4))
+    except ValueError:
+        retries = 3
+    client = OpenAI(api_key=config.api_key, base_url=config.base_url, timeout=config.timeout_s, max_retries=0)
+    for attempt in range(retries + 1):
+        timeout = _timeout(config, deadline)
+        try:
+            response = client.chat.completions.create(
+                model=config.model,
+                messages=[{"role": "user", "content": content}],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout,
+            )
+            break
+        except Exception as error:
+            status = _retryable_status(error)
+            if status is None or attempt >= retries:
+                raise
+            delay = _retry_delay(attempt)
+            left = _remaining(deadline)
+            if left is not None and left <= delay + 1:
+                raise
+            _log(f"provider status={status}; retrying in {delay:.1f}s")
+            time.sleep(delay)
     message = response.choices[0].message
     text = message.content or getattr(message, "reasoning_content", "") or ""
     if not isinstance(text, str) or not text.strip():
