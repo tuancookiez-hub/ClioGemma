@@ -1,179 +1,158 @@
-# Current release review - score recovery plan
+# Current release review - verified7 candidate
 
 **Updated:** 2026-07-12
 
 **Track:** AMD Developer Hackathon ACT II, Track 2 - Video Captioning
 
-**Production policy:** Novita provider; Gemma family only; no separate judge
+**Production policy:** Novita provider; Gemma family only; no non-Gemma writer or separate judge
 
 ## Executive decision
 
-Do not resubmit the old fast image. Its official score moved from **0.66** to
-only **0.68** after concurrency and 429 handling were fixed. The +0.02 gain
-shows that rate limiting was real but not the dominant cause. The large
-remaining gap is architectural: one multimodal call was being asked to both
-understand the video and write four conflicting tones.
+Submit this exact immutable image next:
 
-The next submission should be the `verified5` Gemma 4 candidate documented
-below. It is contract-valid and has passed real-video Docker-style tests, but a
-score above 0.92 is not a fact until the AMD evaluator measures the exact
-published digest.
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-8f-pairs-picker-p2-r1`
+
+Manifest digest:
+
+`sha256:b0f2f7040b94b0cb7a994c5ebea5ff08d85e8addc759d494009581765ef7d026`
+
+The confirmed ClioGemma score is **0.85**, earned by the older four-frame
+`verified5` architecture. The new `verified7` artifact is materially different
+and has not yet been measured by AMD. Local testing establishes contract,
+runtime, and qualitative readiness; it does not prove a score above 0.92.
 
 ## Official score history
 
 | Image | Material configuration | Official score |
 |---|---|---:|
-| `gemma3-5frames` | Gemma 3, five frames, one call, higher concurrency | 0.66 |
-| `gemma3-5frames-p2-r1` | Same quality path, parallelism two, bounded 429/5xx retry | 0.68 |
-| `gemma4-4f-verified5-p2-r1` | Verified evidence plus direct multimodal personas | Pending |
+| `gemma3-5frames` | Gemma 3, five frames, one call | 0.66 |
+| `gemma3-5frames-p2-r1` | Same caption path with bounded retries and parallelism two | 0.68 |
+| `gemma4-4f-verified5-p2-r1` | Four-frame evidence, verification, direct personas, final revision | 0.85 |
+| `gemma4-4f-verified5-p2-r2` | Sarcasm cleanup variant | Result not recorded in this repository |
+| `gemma4-8f-pairs-picker-p2-r1` | Eight-frame evidence, two candidates per style, visual selection | Pending |
 
-The first two rows prove that operational reliability alone cannot close a
-0.24 gap to the 0.92 leader.
+The jump from 0.68 to 0.85 proves that caption architecture and style identity
+matter much more than retry tuning alone. The remaining target is at least 0.93.
 
-## What the public competitors actually do
+## Evidence from public high-scoring systems
 
-The GitHub repositories are not always the submitted artifacts. The findings
-below come from both public source and the public Docker images.
+The findings below are architectural observations, not code copied into
+ClioGemma. GitHub branches and mutable container tags are not guaranteed to be
+the exact historical leaderboard artifacts.
 
-| System | Reported score | Production pattern | Main limitation |
-|---|---:|---|---|
-| [Stryvo Vision](https://github.com/StrvyoLabs/Stryvo-Vision) | 0.88 | 12 frames, one dense visual description, four independent style rewrites with few-shots | No second visual verification |
-| [Raccoon Vision Translator](https://github.com/Showraiser/Raccoon-Vision-Translator) | 0.88 | 4-6 frames, Gemma 4 description, visual verification, separate sequential style writers, text-only QC | QC does not recheck frames; many calls and optional audio add failure surface |
-| [ProVision V2](https://lablab.ai/ai-hackathons/amd-developer-hackathon-act-ii/meowvision/provision-v2) | 0.92 | Three frames, Kimi K2P6 description, visual verification, sequential style writers with prior-caption diversity | Public tag provenance is not cryptographically bound to the score |
-| [Quiptionary](https://github.com/praneethd2007-a11y/video-caption-agent-epso) | 0.92 | Four frames sent directly to Qwen3.7 Plus once per style, strong persona prompts, temperature 0.7 | Minimal grounding and sequential runtime, but excellent style identity |
+| System | Reported score | Useful production lesson |
+|---|---:|---|
+| [Stryvo Vision](https://github.com/StrvyoLabs/Stryvo-Vision) | 0.88 | Dense visual grounding followed by independent style generation |
+| [Raccoon Vision Translator](https://github.com/Showraiser/Raccoon-Vision-Translator) | 0.88 | Visual verification and sequential persona writers |
+| [Yash video captioner](https://github.com/yash-kumarx/amd-hackathon-video-captioning) | 0.91 | Eight-frame chronological story, candidate pools, frame-aware selection; inspected image used mixed providers, so only structural ideas were transferred |
+| [ProVision V2](https://lablab.ai/ai-hackathons/amd-developer-hackathon-act-ii/meowvision/provision-v2) | 0.92 | Three-frame description, verification, then separate style writers |
+| [Quiptionary](https://github.com/praneethd2007-a11y/video-caption-agent-epso) | 0.92 | Direct visual generation per style with strong, unmistakable persona prompts |
 
-The consistent signal is **one generation per style with a strong voice**.
-Verification helps accuracy, but Quiptionary proves that distinctive persona
-prompts plus concrete visual details can reach 0.92 without a separate evidence
-stage. The new candidate combines both lessons.
+Repeated signal: accuracy requires chronological visual facts, while the style
+score requires each requested tone to be generated independently rather than
+as four compromises in one response.
 
-## ProVision image legitimacy
-
-The public Docker Hub tag
-[`track2-provision-kimi-3frames-cleanup-beta`](https://hub.docker.com/r/somnuskai/amd-track2-captioner/tags?name=track2-provision-kimi-3frames-cleanup-beta)
-is a real, pullable, unobfuscated Linux image. The source contains a normal
-Track 2 harness and no hardcoded evaluator answers.
-
-Live metadata checked on 2026-07-11:
-
-- Tag digest: `sha256:f747f459e5631b0c2c381d6436e9003971aa21eeddc3a472687b919738e1b633`
-- Linux/amd64 manifest: `sha256:806fbc48ca2e81a3e0b6ba39cce3b0f617178de0bf61240bae126c7feed8656e`
-- Last pushed: `2026-07-10T22:28:22Z`
-- Image source/defaults: Kimi K2P6, three frames, visual draft then visual verification, four sequential style calls, checks disabled
-
-There is no evidence that the owner replaced the image to sabotage copying.
-The digest remained stable during this review. However, Docker tags are
-mutable and the leaderboard does not publish the evaluated digest, so no one
-outside the organizer can prove that the current tag is byte-for-byte the
-artifact that earned 0.92. The README inside the image still mentions 0.91 and
-an older tag, which is consistent with stale documentation but is not proof of
-tampering.
-
-The public project page labels Gemini 3 Flash while the image defaults to Kimi
-K2P6. Treat the image configuration as evidence of runtime behavior and the
-project-page technology label as presentation metadata.
-
-## New ClioGemma architecture
+## Verified7 architecture
 
 ```text
 /input/tasks.json
-  -> download and ffprobe
-  -> four chronological FFmpeg anchors (896px)
-  -> Gemma 4 observer: structured scene, subjects, facts, timeline,
-     caption anchor, visible text, and do-not-claim ledger
-  -> Gemma 4 second visual observer: correct unsupported evidence
-  -> four direct multimodal persona writers, each seeing the frames and
-     verified evidence; formal uses low temperature and creative styles 0.82
-  -> deterministic style checks and one bounded repair when needed
-  -> one final Gemma 4 revision against the original images and verified facts
-  -> exact requested keys in /output/results.json
+  -> download, ffprobe, and chronological FFmpeg sampling
+  -> eight 768px anchors
+  -> Gemma 4 observer: scene, subjects, stable facts, timeline, scene story,
+     conservative caption anchor, visible text, and do-not-claim ledger
+  -> Gemma 4 second visual observer removes unsupported evidence
+  -> four independent Gemma 4 persona calls
+       -> Candidate A: polished, literal-first, reliable
+       -> Candidate B: different construction, sharper but still grounded
+  -> Gemma 4 visual selector compares all candidates against six anchors
+  -> deterministic exact-candidate, schema, length, style, and stock-phrase guard
+  -> atomic /output/results.json after every completed task
 ```
 
-What is new beyond the public 0.92 pattern:
+Every model role is `google/gemma-4-31b-it` through Novita. There is no Claude,
+Kimi, Gemini, audio model, external scoring judge, hardcoded evaluator answer,
+or provider fallback in the image.
 
-1. A structured negative-evidence ledger tells every writer what not to claim.
-2. Each creative caption retains a real video detail but may use the bold,
-   clearly figurative motives and mini-scenarios rewarded by AMD's examples.
-3. The final revision sees the original frames; Raccoon's QC sees only prose,
-   and ProVision's shipped `RUN_CHECKS=false` path has no active final gate.
-4. Mechanical checks reject process leakage, missing sarcasm cues, missing or
-   awkward tech analogies, and technical terms in the non-tech style without
-   suppressing obvious figurative humor.
-5. A slow individual call no longer erases every caption for that clip. Timeouts
-   are retried once within the clip deadline, and completed evidence is retained.
+## Improvements beyond the 0.85 image
 
-The new official FAQ supersedes the earlier hidden-count and per-request
-wording. It publishes eight retired validation clips but does not disclose the
-new hidden-set count. Provider calls use a 40-second timeout inside a 570-second
-container budget.
+1. **Temporal coverage:** eight anchors replace four and produce a two-sentence
+   beginning-to-end scene story.
+2. **Candidate diversity:** each style receives two alternatives instead of one,
+   allowing the system to trade off accuracy and creative strength.
+3. **Frame-aware selection:** the selector sees six chronological images and the
+   verified evidence rather than judging prose alone.
+4. **Less repetitive humor:** stock openings and generic 404, legacy-code,
+   Monday, chores, dinner, kitchen, and snack formulas are discouraged and
+   mechanically penalized during tie-breaking.
+5. **Peripheral-text protection:** proper names and exact sign text cannot enter
+   a caption merely because OCR placed them in `visible_text`. This was added
+   after a real frame check caught an incorrect background business name.
+6. **Partial-result resilience:** valid results are written atomically after
+   each task, so a later timeout does not erase earlier captions.
+7. **Reproducible image settings:** model roles, pipeline, frame count, frame
+   width, task parallelism, request timeout, and clip timeout are embedded in
+   the published image.
 
-All model roles remain Gemma 4 on Novita. No separate judge or non-Gemma writer
-is introduced.
+## Exact validation evidence
 
-## Current test evidence
-
-The current source passed:
+Repository validation:
 
 - `python -m pytest tests -q`: 6 passed
-- `python -m compileall -q app tests`
-- `git diff --check`
-- Gemma 4 text probe: 3.6 seconds
-- Gemma 4 image probe: 5.4 seconds
-- All eight AMD retired validation clips: 8/8 tasks, 32/32 captions, exit 0,
-  367.7 seconds at parallelism two, including one recovered provider timeout
+- `python -m compileall -q app tests`: passed
+- `git diff --check`: passed
 
-The official-example outputs contained specific visible details and much
-stronger personas than the 0.68 path. Markdown emphasis and a weak rare
-sarcasm recovery were corrected before the final run.
+Exact final source on all eight retired AMD videos:
 
-## Can this exceed 0.92?
+- 8/8 tasks
+- 32/32 requested captions
+- valid style keys and non-empty values
+- exit code 0
+- 218.4 seconds at task parallelism two
+- no provider, selector, or schema failures
 
-It is possible, but not yet measurable with high confidence. The strongest
-evidence in favor is that the candidate now contains every repeated structural
-feature of the 0.88-0.92 systems and adds frame-aware final correction. The
-strongest evidence against certainty is that ProVision uses Kimi K2P6, and the
-AMD judge and hidden clips are unavailable locally.
+Published artifact validation:
 
-A reasonable pre-submission assessment is:
+- public Linux/amd64 OCI manifest
+- anonymous registry request: HTTP 200
+- pulled digest: `sha256:b0f2f7040b94b0cb7a994c5ebea5ff08d85e8addc759d494009581765ef7d026`
+- judge-style run with no source mount and no environment override
+- 2/2 retired tasks, 8/8 captions, valid schema, exit code 0
+- 103.3 seconds
 
-- High confidence the candidate beats the old 0.68 path if the public key and
-  endpoint remain healthy.
-- Moderate confidence it reaches the high 0.80s or low 0.90s.
-- Low-to-moderate confidence it exceeds 0.92 on the first submission.
-- No honest basis yet for claiming 0.95.
+## Score assessment
 
-The official score is the only calibration signal that can turn those ranges
-into evidence.
+The new image is a credible attempt to move from 0.85 into the 0.90-plus range,
+because it directly addresses the largest observed weaknesses: limited temporal
+coverage, single-shot persona writing, generic repeated jokes, and prose-only
+selection. It also retains a large runtime margin.
 
-## Submission experiment order
+There is still no defensible way to simulate the hidden AMD score exactly. The
+hidden clips, reference expectations, judge prompt, weighting, and stochastic
+provider behavior are unavailable. A reasonable pre-submission expectation is
+roughly **0.88-0.93**, with a real but not high-confidence chance of exceeding
+0.92. A 0.95 claim would be speculation until an official score demonstrates it.
 
-Do not mutate tags. Publish a new immutable tag for every experiment and record
-its manifest digest.
+## Next experiment policy
 
-1. `gemma4-4f-verified5-p2-r1` - full candidate; submit first.
-2. If accuracy is high but style appears weak, change only creative temperature
-   or the humorous-tech prompt.
-3. If temporal facts are wrong, test five anchors while keeping the model and
-   prompts fixed.
-4. If timeouts/fallbacks appear, lower parallelism from two to one without
-   changing prompts.
-5. Keep the best official score; do not infer gains from local prose alone.
-
-For every submission record: tag, digest, Git commit, frame count, model roles,
-parallelism, timestamp, score, and observed evaluator error.
+1. Submit only `gemma4-8f-pairs-picker-p2-r1` and record its digest and score.
+2. Do not mutate this tag. Every later experiment gets a new tag.
+3. If the score is below 0.90, inspect whether the failure is accuracy, style,
+   or incomplete outputs before changing architecture.
+4. If the score is 0.90-0.92, preserve evidence and runtime; vary one creative
+   factor at a time, starting with the sarcasm and non-tech candidate prompts.
+5. If it exceeds 0.92, keep it as the control and make only evidence-backed
+   attempts at 0.93-plus.
+6. Record tag, digest, Git commit, model, frame settings, parallelism, timestamp,
+   official score, and evaluator error for every submission.
 
 ## Release checklist
 
-- [x] Required `/input/tasks.json` to `/output/results.json` contract preserved.
-- [x] Linux/amd64 entrypoint preserved.
-- [x] Requested style keys preserved exactly.
-- [x] Six repository tests pass.
-- [x] Real Gemma 4 text and image calls pass.
-- [x] All eight official retired validation clips pass within 570 seconds.
-- [x] Commit and push candidate source (`d4d1a36`).
-- [x] Build and push the exact public `gemma4-4f-verified5-p2-r1` image.
-- [x] Pull anonymously and verify linux/amd64 digest
-  `sha256:42b6db6e6438d1adbb34f3d4120d02a0f24b7c5616fb24df51f1a21ce63a97b5`.
-- [x] Run the exact published image against mounted input/output: 3/3 retired
-  clips, 12/12 captions, exit 0, 170.3 seconds at parallelism one.
-- [ ] Submit the exact registry reference and record the official score.
+- [x] Track 2 input/output contract preserved.
+- [x] Linux/amd64 entrypoint and exact requested style keys preserved.
+- [x] Novita-only and Gemma-only production roles enforced.
+- [x] Repository tests and compilation pass.
+- [x] All eight retired validation clips pass within the 570-second budget.
+- [x] Immutable public tag pushed.
+- [x] Anonymous pull access and manifest digest verified.
+- [x] Exact published image passes a mounted input/output smoke test.
+- [ ] Submit the exact tag and record the official score.

@@ -5,8 +5,9 @@ ClioGemma is a Dockerized video-captioning agent. It reads
 with the requested `formal`, `sarcastic`, `humorous_tech`, and
 `humorous_non_tech` captions.
 
-The current leaderboard score is **0.68**. That score belongs to the older
-Gemma 3 fast image, not the stronger candidate in this source tree.
+The current confirmed leaderboard score is **0.85**. That score belongs to the
+older four-frame `verified5` image, not the eight-frame candidate in this source
+tree. The new image has not yet received an AMD score.
 
 ## Current candidate
 
@@ -14,25 +15,26 @@ The next release candidate is Novita-only and Gemma-only:
 
 ```text
 video
-  -> four chronological visual anchors
+  -> eight chronological visual anchors
   -> Gemma 4 factual evidence record with an explicit do-not-claim ledger
   -> second Gemma 4 visual verification pass
-  -> four direct multimodal persona writers with style-specific temperatures
-  -> final Gemma 4 revision against the original images
-  -> deterministic schema/style validation
+  -> one direct multimodal writer per style, producing two alternatives
+  -> Gemma 4 visual selector compares both alternatives against six anchors
+  -> deterministic schema, length, cliché, and style validation
   -> /output/results.json
 ```
 
 There is no Claude, Kimi, Gemini, external judge, or provider fallback in the
-image. The observer, verifier, writer, and final grounding revision all use
-`google/gemma-4-31b-it` through Novita. The final revision is part of caption
-generation, not a scoring model.
+image. The observer, verifier, persona writers, and visual selector all use
+`google/gemma-4-31b-it` through Novita. The selector is part of caption
+generation, not a separate scoring model or provider.
 
 This architecture combines verified evidence with the strongest lesson from
-the current 0.92 Quiptionary image and AMD's retired validation examples:
-every creative style needs a distinctive voice, bold figurative humor, and at
-least one concrete visible detail. ClioGemma adds a do-not-claim ledger and a
-final frame-aware revision without flattening obvious jokes.
+the public 0.91-0.92 systems and AMD's retired validation examples: every
+creative style needs a distinctive voice, bold figurative humor, and concrete
+visible details. ClioGemma adds pairwise alternatives, a frame-aware selector,
+stock-phrase rejection, and a rule that prevents uncertain peripheral text
+from becoming a literal caption claim.
 
 ## Build the leaderboard candidate
 
@@ -45,10 +47,11 @@ docker buildx build --platform linux/amd64 `
   --build-arg CLIO_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_VERIFY_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_CAPTION_MODEL=google/gemma-4-31b-it `
-  --build-arg CLIO_PIPELINE=verified5 `
-  --build-arg SWIFTCLIP_FRAME_COUNT=4 `
+  --build-arg CLIO_PIPELINE=verified7 `
+  --build-arg SWIFTCLIP_FRAME_COUNT=8 `
+  --build-arg SWIFTCLIP_FRAME_WIDTH=768 `
   --build-arg SWIFTCLIP_PARALLEL=2 `
-  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-p2-r1 `
+  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-8f-pairs-picker-p2-r1 `
   --push .
 ```
 
@@ -59,18 +62,20 @@ rotate it after judging; never commit it to Git.
 
 - Six repository tests pass.
 - Python compilation passes.
-- One real Gemma 4 image request completed in 5.4 seconds.
-- All eight official retired validation videos completed 8/8 tasks and 32/32
-  captions with exit code zero in 367.7 seconds at parallelism two, inside the
-  570-second budget. Outputs retained specific details and strong personas.
+- The exact final source completed all eight retired validation videos: 8/8
+  tasks, 32/32 captions, exit code zero in 218.4 seconds at parallelism two.
+- The pulled public image completed a judge-style test with only `/input` and
+  `/output` mounted: 2/2 tasks, 8/8 captions, valid schema, exit zero in 103.3
+  seconds.
+- Anonymous GHCR manifest access returned HTTP 200.
 
 These are reliability and qualitative checks, not a substitute for the hidden
 AMD score. Only the leaderboard can confirm a score above 0.92.
 
 Published candidate:
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-p2-r1`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-8f-pairs-picker-p2-r1`
 
-Digest: `sha256:42b6db6e6438d1adbb34f3d4120d02a0f24b7c5616fb24df51f1a21ce63a97b5`
+Digest: `sha256:b0f2f7040b94b0cb7a994c5ebea5ff08d85e8addc759d494009581765ef7d026`
 
 See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
 score diagnosis, competitor evidence, provenance caveats, and experiment plan.

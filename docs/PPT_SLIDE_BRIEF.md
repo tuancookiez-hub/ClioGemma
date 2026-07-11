@@ -34,10 +34,10 @@ directions.
 ### 3. Product flow
 
 1. Receive a video task.
-2. Sample four chronological moments.
+2. Sample eight chronological moments.
 3. Build and verify a factual record.
-4. Write each requested style separately.
-5. Recheck captions against the images.
+4. Write two alternatives for each requested style.
+5. Select the strongest grounded alternative against the images.
 6. Return evaluator-ready JSON.
 
 ### 4. Architecture
@@ -45,11 +45,11 @@ directions.
 ```mermaid
 flowchart LR
     A["/input/tasks.json"] --> B["Download + FFmpeg"]
-    B --> C["3 anchors: 5%, 50%, 95%"]
+    B --> C["8 chronological anchors"]
     C --> D["Gemma 4 evidence record"]
     D --> E["Gemma 4 visual verification"]
-    E --> F["4 separate style writers"]
-    F --> G["Frame-grounded final revision"]
+    E --> F["4 persona writers x 2 candidates"]
+    F --> G["Frame-aware candidate selector"]
     G --> H["Schema validation"]
     H --> I["/output/results.json"]
 ```
@@ -107,7 +107,7 @@ Include the GitHub repository, demo URL, and public image reference.
 ## Claims to avoid
 
 - Do not claim a score above 0.92 unless the exact image digest receives it.
-- Do not describe the older 0.68 image as the current architecture.
+- Do not describe the older 0.85 image as the current architecture.
 - Do not claim Claude, Kimi, Gemini, Fireworks, Whisper, or an external judge
   is used in production.
 - Do not expose credentials.
