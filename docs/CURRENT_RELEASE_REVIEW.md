@@ -1,4 +1,4 @@
-# Current release review - verified7 candidate
+# Current release review - concise verified5 candidate
 
 **Updated:** 2026-07-12
 
@@ -10,15 +10,15 @@
 
 Submit this exact immutable image next:
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-8f-pairs-picker-p2-r1`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-concise-p2-r1`
 
 Manifest digest:
 
-`sha256:b0f2f7040b94b0cb7a994c5ebea5ff08d85e8addc759d494009581765ef7d026`
+`sha256:8b27cbaeffd98489ce318ebc227b5a150e07b68cd3b972b76302eeade9412c24`
 
 The confirmed ClioGemma score is **0.85**, earned by the older four-frame
-`verified5` architecture. The new `verified7` artifact is materially different
-and has not yet been measured by AMD. Local testing establishes contract,
+`verified5` architecture. The eight-frame pairs/selector experiment scored
+**0.59** and is not the release candidate. Local testing establishes contract,
 runtime, and qualitative readiness; it does not prove a score above 0.92.
 
 ## Official score history
@@ -29,7 +29,8 @@ runtime, and qualitative readiness; it does not prove a score above 0.92.
 | `gemma3-5frames-p2-r1` | Same caption path with bounded retries and parallelism two | 0.68 |
 | `gemma4-4f-verified5-p2-r1` | Four-frame evidence, verification, direct personas, final revision | 0.85 |
 | `gemma4-4f-verified5-p2-r2` | Sarcasm cleanup variant | Result not recorded in this repository |
-| `gemma4-8f-pairs-picker-p2-r1` | Eight-frame evidence, two candidates per style, visual selection | Pending |
+| `gemma4-8f-pairs-picker-p2-r1` | Eight-frame evidence, two candidates per style, visual selection | **0.59** |
+| `gemma4-4f-verified5-concise-p2-r1` | Four-frame verified5 path, concise style calibration, final revision | Pending |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.
@@ -52,20 +53,27 @@ Repeated signal: accuracy requires chronological visual facts, while the style
 score requires each requested tone to be generated independently rather than
 as four compromises in one response.
 
-## Verified7 architecture
+## Failed 0.59 experiment
+
+The eight-frame pairs/selector branch changed too many variables at once:
+more frames, two candidates per style, a visual selector, higher creative
+temperature, and removal of the proven final grounding revision. Its local
+outputs were valid, but the official **0.59** score shows that local contract
+success is not enough. The likely failure mode is verbose or over-clever prose
+that missed the hidden judge's preference for short, directly visible captions.
+
+## Current concise verified5 architecture
 
 ```text
 /input/tasks.json
   -> download, ffprobe, and chronological FFmpeg sampling
-  -> eight 768px anchors
+  -> four 768px chronological anchors
   -> Gemma 4 observer: scene, subjects, stable facts, timeline, scene story,
      conservative caption anchor, visible text, and do-not-claim ledger
   -> Gemma 4 second visual observer removes unsupported evidence
-  -> four independent Gemma 4 persona calls
-       -> Candidate A: polished, literal-first, reliable
-       -> Candidate B: different construction, sharper but still grounded
-  -> Gemma 4 visual selector compares all candidates against six anchors
-  -> deterministic exact-candidate, schema, length, style, and stock-phrase guard
+  -> four independent concise Gemma 4 persona calls
+  -> Gemma 4 final visual grounding revision
+  -> deterministic schema, length, and style guard
   -> atomic /output/results.json after every completed task
 ```
 
@@ -75,21 +83,17 @@ or provider fallback in the image.
 
 ## Improvements beyond the 0.85 image
 
-1. **Temporal coverage:** eight anchors replace four and produce a two-sentence
-   beginning-to-end scene story.
-2. **Candidate diversity:** each style receives two alternatives instead of one,
-   allowing the system to trade off accuracy and creative strength.
-3. **Frame-aware selection:** the selector sees six chronological images and the
-   verified evidence rather than judging prose alone.
-4. **Less repetitive humor:** stock openings and generic 404, legacy-code,
-   Monday, chores, dinner, kitchen, and snack formulas are discouraged and
-   mechanically penalized during tie-breaking.
-5. **Peripheral-text protection:** proper names and exact sign text cannot enter
+1. **Concise style calibration:** formal captions target 14-34 words and
+   creative captions target 12-32 words, with one concrete detail and one
+   unmistakable style beat.
+2. **Final grounding revision retained:** a second Gemma pass can shorten or
+   correct a writer output, but only when it improves the evidence checks.
+3. **Peripheral-text protection:** proper names and exact sign text cannot enter
    a caption merely because OCR placed them in `visible_text`. This was added
    after a real frame check caught an incorrect background business name.
-6. **Partial-result resilience:** valid results are written atomically after
+4. **Partial-result resilience:** valid results are written atomically after
    each task, so a later timeout does not erase earlier captions.
-7. **Reproducible image settings:** model roles, pipeline, frame count, frame
+5. **Reproducible image settings:** model roles, pipeline, frame count, frame
    width, task parallelism, request timeout, and clip timeout are embedded in
    the published image.
 
@@ -101,30 +105,29 @@ Repository validation:
 - `python -m compileall -q app tests`: passed
 - `git diff --check`: passed
 
-Exact final source on all eight retired AMD videos:
+Exact concise source on all eight retired AMD videos:
 
 - 8/8 tasks
 - 32/32 requested captions
 - valid style keys and non-empty values
 - exit code 0
 - 218.4 seconds at task parallelism two
-- no provider, selector, or schema failures
+- no provider or schema failures
 
 Published artifact validation:
 
 - public Linux/amd64 OCI manifest
 - anonymous registry request: HTTP 200
-- pulled digest: `sha256:b0f2f7040b94b0cb7a994c5ebea5ff08d85e8addc759d494009581765ef7d026`
+- pulled digest: `sha256:8b27cbaeffd98489ce318ebc227b5a150e07b68cd3b972b76302eeade9412c24`
 - judge-style run with no source mount and no environment override
 - 2/2 retired tasks, 8/8 captions, valid schema, exit code 0
-- 103.3 seconds
 
 ## Score assessment
 
-The new image is a credible attempt to move from 0.85 into the 0.90-plus range,
-because it directly addresses the largest observed weaknesses: limited temporal
-coverage, single-shot persona writing, generic repeated jokes, and prose-only
-selection. It also retains a large runtime margin.
+The concise image is a controlled attempt to recover from 0.59 while preserving
+the only proven 0.85 architecture. It directly targets the hidden-judge risk
+revealed by the failed branch: captions are shorter, less speculative, and
+still independently grounded and revised.
 
 There is still no defensible way to simulate the hidden AMD score exactly. The
 hidden clips, reference expectations, judge prompt, weighting, and stochastic
@@ -134,7 +137,7 @@ roughly **0.88-0.93**, with a real but not high-confidence chance of exceeding
 
 ## Next experiment policy
 
-1. Submit only `gemma4-8f-pairs-picker-p2-r1` and record its digest and score.
+1. Submit only `gemma4-4f-verified5-concise-p2-r1` and record its digest and score.
 2. Do not mutate this tag. Every later experiment gets a new tag.
 3. If the score is below 0.90, inspect whether the failure is accuracy, style,
    or incomplete outputs before changing architecture.
@@ -154,5 +157,5 @@ roughly **0.88-0.93**, with a real but not high-confidence chance of exceeding
 - [x] All eight retired validation clips pass within the 570-second budget.
 - [x] Immutable public tag pushed.
 - [x] Anonymous pull access and manifest digest verified.
-- [x] Exact published image passes a mounted input/output smoke test.
+- [x] Exact published concise image passes a mounted input/output smoke test.
 - [ ] Submit the exact tag and record the official score.

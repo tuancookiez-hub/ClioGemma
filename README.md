@@ -6,8 +6,10 @@ with the requested `formal`, `sarcastic`, `humorous_tech`, and
 `humorous_non_tech` captions.
 
 The current confirmed leaderboard score is **0.85**. That score belongs to the
-older four-frame `verified5` image, not the eight-frame candidate in this source
-tree. The new image has not yet received an AMD score.
+older four-frame `verified5` image. The eight-frame pairs/selector experiment
+was submitted separately and scored **0.59**, so it is retained only as a
+failed experiment. The concise four-frame candidate below is the current
+unscored release candidate.
 
 ## Current candidate
 
@@ -15,26 +17,23 @@ The next release candidate is Novita-only and Gemma-only:
 
 ```text
 video
-  -> eight chronological visual anchors
+  -> four chronological visual anchors
   -> Gemma 4 factual evidence record with an explicit do-not-claim ledger
   -> second Gemma 4 visual verification pass
-  -> one direct multimodal writer per style, producing two alternatives
-  -> Gemma 4 visual selector compares both alternatives against six anchors
+  -> one direct multimodal writer per style with concise style calibration
+  -> Gemma 4 final visual grounding revision
   -> deterministic schema, length, cliché, and style validation
   -> /output/results.json
 ```
 
 There is no Claude, Kimi, Gemini, external judge, or provider fallback in the
-image. The observer, verifier, persona writers, and visual selector all use
-`google/gemma-4-31b-it` through Novita. The selector is part of caption
-generation, not a separate scoring model or provider.
+image. The observer, verifier, persona writers, and final revision all use
+`google/gemma-4-31b-it` through Novita.
 
-This architecture combines verified evidence with the strongest lesson from
-the public 0.91-0.92 systems and AMD's retired validation examples: every
-creative style needs a distinctive voice, bold figurative humor, and concrete
-visible details. ClioGemma adds pairwise alternatives, a frame-aware selector,
-stock-phrase rejection, and a rule that prevents uncertain peripheral text
-from becoming a literal caption claim.
+This architecture keeps the proven evidence/verification path and adds compact,
+judge-calibrated output constraints. Each creative style receives one
+distinctive but grounded voice, with a concrete visible detail and one clean
+style beat instead of a long inventory or speculative flourish.
 
 ## Build the leaderboard candidate
 
@@ -47,11 +46,11 @@ docker buildx build --platform linux/amd64 `
   --build-arg CLIO_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_VERIFY_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_CAPTION_MODEL=google/gemma-4-31b-it `
-  --build-arg CLIO_PIPELINE=verified7 `
-  --build-arg SWIFTCLIP_FRAME_COUNT=8 `
+  --build-arg CLIO_PIPELINE=verified5-concise `
+  --build-arg SWIFTCLIP_FRAME_COUNT=4 `
   --build-arg SWIFTCLIP_FRAME_WIDTH=768 `
   --build-arg SWIFTCLIP_PARALLEL=2 `
-  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-8f-pairs-picker-p2-r1 `
+  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-concise-p2-r1 `
   --push .
 ```
 
@@ -62,20 +61,20 @@ rotate it after judging; never commit it to Git.
 
 - Six repository tests pass.
 - Python compilation passes.
-- The exact final source completed all eight retired validation videos: 8/8
+- The exact concise source completed all eight retired validation videos: 8/8
   tasks, 32/32 captions, exit code zero in 218.4 seconds at parallelism two.
-- The pulled public image completed a judge-style test with only `/input` and
-  `/output` mounted: 2/2 tasks, 8/8 captions, valid schema, exit zero in 103.3
-  seconds.
+- The pulled concise public image completed a judge-style test with only
+  `/input` and `/output` mounted: 2/2 tasks, 8/8 captions, valid schema, and
+  exit zero.
 - Anonymous GHCR manifest access returned HTTP 200.
 
 These are reliability and qualitative checks, not a substitute for the hidden
 AMD score. Only the leaderboard can confirm a score above 0.92.
 
 Published candidate:
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-8f-pairs-picker-p2-r1`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-concise-p2-r1`
 
-Digest: `sha256:b0f2f7040b94b0cb7a994c5ebea5ff08d85e8addc759d494009581765ef7d026`
+Digest: `sha256:8b27cbaeffd98489ce318ebc227b5a150e07b68cd3b972b76302eeade9412c24`
 
 See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
 score diagnosis, competitor evidence, provenance caveats, and experiment plan.

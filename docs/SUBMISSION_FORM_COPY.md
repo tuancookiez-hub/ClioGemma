@@ -12,7 +12,7 @@
 
 ### Long description
 
-> ClioGemma is a containerized video-captioning agent for AMD Developer Hackathon ACT II, Track 2. It reads `/input/tasks.json`, downloads each clip, and samples eight chronological visual anchors with FFmpeg. Novita-hosted Gemma 4 creates and independently verifies a structured scene story, stable facts, timeline, and claims to avoid. Four direct multimodal persona writers each generate two grounded alternatives for formal, sarcastic, humorous-tech, and humorous-non-tech output. A final Gemma 4 visual selector compares the alternatives against six chronological images before deterministic validation writes exact-schema `/output/results.json`. The public `linux/amd64` image uses only Novita and Gemma, with no separate judge, non-Gemma writer, audio model, or hardcoded evaluator answers.
+> ClioGemma is a containerized video-captioning agent for AMD Developer Hackathon ACT II, Track 2. It reads `/input/tasks.json`, downloads each clip, and samples four chronological visual anchors with FFmpeg. Novita-hosted Gemma 4 creates and independently verifies a structured scene story, stable facts, timeline, and claims to avoid. Four direct multimodal persona writers each produce one concise grounded caption for formal, sarcastic, humorous-tech, and humorous-non-tech output. A final Gemma 4 visual grounding revision checks the captions against the evidence before deterministic validation writes exact-schema `/output/results.json`. The public `linux/amd64` image uses only Novita and Gemma, with no separate judge, non-Gemma writer, audio model, or hardcoded evaluator answers.
 
 ### Categories
 
@@ -50,15 +50,15 @@ localhost URL.
 
 ### Docker image
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-8f-pairs-picker-p2-r1`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-concise-p2-r1`
 
 Verified public digest:
 
-`sha256:b0f2f7040b94b0cb7a994c5ebea5ff08d85e8addc759d494009581765ef7d026`
+`sha256:8b27cbaeffd98489ce318ebc227b5a150e07b68cd3b972b76302eeade9412c24`
 
 ### Additional information
 
-> ClioGemma's submission image is a public `linux/amd64` container that follows the Track 2 contract: it reads `/input/tasks.json`, returns every requested caption style, writes valid `/output/results.json`, and exits cleanly. The production path uses eight chronological FFmpeg anchors and Novita-hosted Google Gemma 4 for factual observation, independent visual verification, two persona-specific alternatives per style, and frame-aware final selection. It uses no external judge, non-Gemma caption writer, audio model, or hardcoded evaluator answer. The exact image completed all eight retired validation videos with 32/32 captions in 218.4 seconds and its pulled public artifact passed a separate mounted input/output run. The public Streamlit application is a human-facing demo; the AMD evaluator runs the Docker entrypoint. The restricted, revocable Track 2 credential is not stored in GitHub.
+> ClioGemma's submission image is a public `linux/amd64` container that follows the Track 2 contract: it reads `/input/tasks.json`, returns every requested caption style, writes valid `/output/results.json`, and exits cleanly. The production path uses four chronological FFmpeg anchors and Novita-hosted Google Gemma 4 for factual observation, independent visual verification, one concise persona-specific writer per style, and a final grounding revision. It uses no external judge, non-Gemma caption writer, audio model, or hardcoded evaluator answer. The exact source completed all eight retired validation videos with 32/32 captions, and the pulled public artifact passed a separate mounted input/output run with 2/2 tasks and 8/8 captions. The public Streamlit application is a human-facing demo; the AMD evaluator runs the Docker entrypoint. The restricted, revocable Track 2 credential is not stored in GitHub.
 
 ## Final checklist
 

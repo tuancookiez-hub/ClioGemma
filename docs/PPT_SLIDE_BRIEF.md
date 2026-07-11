@@ -34,10 +34,10 @@ directions.
 ### 3. Product flow
 
 1. Receive a video task.
-2. Sample eight chronological moments.
+2. Sample four chronological moments.
 3. Build and verify a factual record.
-4. Write two alternatives for each requested style.
-5. Select the strongest grounded alternative against the images.
+4. Write one concise caption for each requested style.
+5. Run a final Gemma grounding revision against the evidence.
 6. Return evaluator-ready JSON.
 
 ### 4. Architecture
@@ -45,11 +45,11 @@ directions.
 ```mermaid
 flowchart LR
     A["/input/tasks.json"] --> B["Download + FFmpeg"]
-    B --> C["8 chronological anchors"]
+    B --> C["4 chronological anchors"]
     C --> D["Gemma 4 evidence record"]
     D --> E["Gemma 4 visual verification"]
-    E --> F["4 persona writers x 2 candidates"]
-    F --> G["Frame-aware candidate selector"]
+    E --> F["4 concise persona writers"]
+    F --> G["Final Gemma grounding revision"]
     G --> H["Schema validation"]
     H --> I["/output/results.json"]
 ```
