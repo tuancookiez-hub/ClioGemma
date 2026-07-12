@@ -471,6 +471,8 @@ def _style_issues(style: str, caption: str) -> list[str]:
         issues.append("awkward or incorrect tech analogy")
     if style == "humorous_non_tech" and hits:
         issues.append("technical jargon")
+    if caption.count('"') % 2 or caption.count("“") != caption.count("”"):
+        issues.append("unbalanced quotation")
     stock = _STOCK_STYLE.get(style)
     if stock and stock.search(caption):
         issues.append("stock style formula")
@@ -487,7 +489,8 @@ _STOCK_STYLE = {
     ),
     "humorous_tech": re.compile(
         r"\b404\b|motivation not found|legacy (?:codebase|process)|total system crash|"
-        r"software task waiting on one visible input|software task waiting on input",
+        r"software task waiting on one visible input|software task waiting on input|"
+        r"scheduler managing one very visible queue|scheduler keeping one visible sequence moving",
         re.I,
     ),
     "humorous_non_tech": re.compile(
@@ -709,6 +712,7 @@ def _write_verified3_style(
     frames: list[Frame] | None = None,
     concise: bool = False,
     balanced: bool = False,
+    champion: bool = False,
 ) -> str:
     anchor = _normalize_anchor(str(evidence.get("caption_anchor", "")))
     prior_note = ""
@@ -744,6 +748,10 @@ def _write_verified3_style(
         else ""
     )
     length_rule = (
+        "Aim for 18-28 words, hard bounds 14-32, with one crisp factual sentence"
+        if style == "formal"
+        else "Aim for 15-28 words, hard bounds 12-32, with one crisp sentence or two short sentences"
+    ) if champion else (
         "Aim for 18-30 words, hard bounds 14-34, with one crisp factual sentence"
         if style == "formal"
         else "Aim for 16-28 words, hard bounds 12-32, with one crisp sentence or two short sentences"
@@ -775,6 +783,14 @@ def _write_verified3_style(
             "humorous_tech = literal scene + one apt software analogy; "
             "humorous_non_tech = literal scene + one everyday comparison."
         )
+    if champion:
+        calibration += (
+            "\nCHAMPION PRECISION RULES: For formal, mention only the central subject, action/state, setting, "
+            "and one or two unmistakable details; omit peripheral accessories, distant structures, and camera language. "
+            "For creative styles, state the visible scene first, then add exactly one scene-specific style beat. "
+            "Do not use a generic scheduler, queue, packet, or workplace joke unless it maps to the visible action. "
+            "Never leave a quotation, sentence, or thought unfinished."
+        )
     prompt = (
         _VERIFIED3_STYLE_PROMPTS[style]
         + calibration
@@ -789,7 +805,7 @@ def _write_verified3_style(
         + json.dumps(evidence, ensure_ascii=False, indent=2)
     )
     persona_mode = bool(frames)
-    temperature = 0.15 if style == "formal" else (0.65 if concise else (0.82 if persona_mode else 0.7))
+    temperature = 0.15 if style == "formal" else (0.65 if concise else (0.70 if champion else (0.82 if persona_mode else 0.7)))
     content = _timeline_content(frames, prompt) if frames else [{"type": "text", "text": prompt}]
     caption = _normalize(
         _call(
@@ -879,30 +895,50 @@ def _deterministic_verified_caption(style: str, evidence: dict) -> str:
                 if detail and detail.casefold() not in anchor.casefold():
                     return f"{anchor.rstrip('.?!')}. {detail}."
         return f"{anchor.rstrip('.?!')}."
-    endings = {
-        "sarcastic": "and apparently this ordinary scene has decided to become today's main event.",
-        "humorous_tech": "like a scheduler managing one very visible queue.",
-        "humorous_non_tech": "with the determined focus of someone handling an unexpectedly important errand.",
-    }
-    return f"{anchor}, {endings[style]}"
+    anchor_lower = anchor.casefold()
+    if style == "humorous_tech":
+        if any(token in anchor_lower for token in ("traffic", "pedestrian", "vehicle", "intersection")):
+            ending = "like a scheduler coordinating competing requests at one shared endpoint."
+        elif any(token in anchor_lower for token in ("chop", "dice", "vegetable", "knife")):
+            ending = "like a batch job splitting one input into smaller chunks."
+        elif any(token in anchor_lower for token in ("mountain", "camera", "landscape", "ridge")):
+            ending = "like a zoom operation revealing another nested layer."
+        elif any(token in anchor_lower for token in ("wave", "ocean", "beach", "shore")):
+            ending = "like a retry loop repeatedly hitting the same shoreline endpoint."
+        else:
+            ending = "like one clean software operation tied to the visible action."
+    elif style == "humorous_non_tech":
+        if any(token in anchor_lower for token in ("kitten", "cat")):
+            ending = "like a tiny explorer claiming every patch of ground."
+        elif any(token in anchor_lower for token in ("wave", "ocean", "beach", "shore")):
+            ending = "like a toddler asking the same question on repeat."
+        elif any(token in anchor_lower for token in ("runner", "track", "athlete")):
+            ending = "like someone suddenly late for an appointment."
+        else:
+            ending = "with the determined focus of someone handling an oddly important errand."
+    else:
+        ending = "and apparently this ordinary scene has decided to become today's main event."
+    return f"{anchor}, {ending}"
 
 
 def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
+    champion_mode = pipeline in {"verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "champion-r2"}
     hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8"}
     hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8"}
     balanced_mode = pipeline in {
         "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
         "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi",
         "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion",
-        "champion-r3", "gemma-champion",
+        "champion-r3", "champion-r2", "gemma-champion",
     }
     persona_mode = pipeline in {
         "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise",
         "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
         "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8",
         "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion",
+        "champion-r2",
         "persona", "persona-grounded",
     }
     eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8"}
@@ -951,13 +987,14 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                 anchors if persona_mode else None,
                 concise_mode,
                 balanced_mode,
+                champion_mode,
             )
         except Exception as error:
             _log(f"verified3 {style} writer unavailable; using evidence-bound local caption: {error}")
             caption = _deterministic_verified_caption(style, evidence)
         captions[style] = caption
         prior.append(caption)
-    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "persona", "persona-grounded"}:
+    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion", "persona", "persona-grounded"}:
         final_prompt = _VERIFIED4_FINAL_PROMPT.format(
             evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
             captions=json.dumps(captions, ensure_ascii=False, indent=2),
@@ -972,6 +1009,13 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                 "Remove unsupported numbers, durations, names, locations, props, or literal unseen outcomes even when they appear inside a joke. "
                 "Keep each creative punchline tied to the specific visible action or transformation. "
                 "Reject generic legacy-process, weekday-task, empty-bleachers, or other stock formulas; rewrite the joke around the clip-specific detail."
+            )
+        if champion_mode:
+            final_prompt += (
+                "\nFor the champion profile, keep formal captions to the central subject/action/setting plus one or two "
+                "unmistakable details; remove peripheral accessories, distant structures, and camera movement. "
+                "Every creative caption must contain the visible subject/action before one scene-specific style beat. "
+                "Reject generic scheduler/queue jokes, unfinished quotations, and malformed sentences."
             )
         try:
             reviewed_raw = _call(
@@ -991,7 +1035,16 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                 14 <= len(text.split()) <= (34 if style == "formal" else 32)
                 for style, text in reviewed.items()
             ) if concise_mode else True
-            if concise_ok and _issue_count(_caption_batch_issues(reviewed, anchor)) <= _issue_count(_caption_batch_issues(captions, anchor)):
+            champion_ok = all(
+                14 <= len(text.split()) <= (32 if style == "formal" else 30)
+                for style, text in reviewed.items()
+            ) if champion_mode else True
+            reviewed_issues = _caption_batch_issues(reviewed, anchor)
+            has_malformed_quote = any(
+                "unbalanced quotation" in issues
+                for issues in reviewed_issues.values()
+            )
+            if concise_ok and champion_ok and not has_malformed_quote and _issue_count(reviewed_issues) <= _issue_count(_caption_batch_issues(captions, anchor)):
                 captions = reviewed
         except Exception as error:
             _log(f"verified4 final grounding revision skipped: {error}")
@@ -1128,7 +1181,7 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
         "precision", "concise", "verified5-balanced", "verified-5-balanced",
         "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi",
         "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8",
-        "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion",
+        "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion",
         "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline)

@@ -104,7 +104,7 @@ def test_verified_evidence_parser_and_style_guard() -> None:
         "humorous_tech",
         {"caption_anchor": "A train travels beside a platform"},
     )
-    assert "train" in fallback.lower() and "scheduler" in fallback.lower()
+    assert "train" in fallback.lower() and "software operation" in fallback.lower()
 
 
 def test_verified3_uses_first_middle_last_and_gemma_caption_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -155,11 +155,11 @@ def test_champion_profile_keeps_anchor_and_normalizes_final_caption(monkeypatch:
             return json.dumps(evidence)
         if "Act as a strict second visual observer" in prompt:
             return json.dumps(evidence)
-        if "humorous_tech" in prompt:
+        if "Write like a burnt-out software engineer" in prompt:
             return "A train travels beside a platform, like a packet following a stable network route."
-        if "humorous_non_tech" in prompt:
+        if "Write like an observant everyday comedian" in prompt:
             return "A train travels beside a platform, like someone taking the long way home on purpose."
-        if "sarcastic" in prompt:
+        if "Write with the voice of a weary" in prompt:
             return "A train travels beside a platform, because apparently rails remain popular today."
         return "A train travels beside a platform at a visible station structure in an outdoor setting."
 
