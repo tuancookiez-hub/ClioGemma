@@ -15,6 +15,7 @@ from typing import Optional
 from openai import OpenAI
 
 from app.core.frames import Frame
+from app.core.grids import build_timeline_grids
 from app.core.parse import STYLES
 from app.core.provider import NOVITA_GEMMA_MODELS, NOVITA_VISION_MODELS, ProviderConfig, provider_config
 
@@ -343,7 +344,7 @@ VERIFIED EVIDENCE:
 
 _GEMMA_CANDIDATE_PICK_PROMPT = """You are the final Gemma caption editor. For
 each style, choose or minimally repair the strongest candidate below using the
-ordered images and VERIFIED EVIDENCE. Gemma must emit the final captions.
+ordered images and VERIFIED EVIDENCE. The final editor must emit the captions.
 
 Accuracy is a hard gate for literal scene facts. Preserve useful concrete
 details instead of genericizing them. Sarcasm must be dry and clearly funny.
@@ -514,14 +515,38 @@ def _call(config: ProviderConfig, content: list[dict], *, deadline: float | None
     for attempt in range(retries + 1):
         timeout = _timeout(config, deadline)
         try:
+            messages: list[dict] = [{"role": "user", "content": content}]
+            model_name = config.model.lower()
+            if "deepseek" in model_name:
+                # Novita documents DeepSeek V4's non-think mode as a
+                # prompt-level instruction. Keep it in a system message as
+                # well as the provider hint because some compatible routes
+                # ignore the extra_body field.
+                messages.insert(0, {
+                    "role": "system",
+                    "content": (
+                        "Use non-think mode. Do not reveal analysis, planning, "
+                        "or instructions. Return only the requested final "
+                        "caption text or JSON object."
+                    ),
+                })
             request_kwargs = {
                 "model": config.model,
-                "messages": [{"role": "user", "content": content}],
+                "messages": messages,
                 "max_tokens": max_tokens,
                 "timeout": timeout,
             }
-            if config.model.lower() in {item.lower() for item in NOVITA_VISION_MODELS}:
+            if model_name in {item.lower() for item in NOVITA_VISION_MODELS}:
+                # Kimi and Qwen are used for visual evidence.  Disabling their
+                # internal reasoning keeps the response budget available for
+                # the requested evidence schema.
                 request_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+            elif "deepseek" in model_name:
+                # Novita's DeepSeek V4 endpoint exposes the same thinking
+                # control.  Without this, the reasoning transcript is placed
+                # in message.content and JSON caption parsing fails.
+                request_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+                request_kwargs["temperature"] = temperature
             else:
                 request_kwargs["temperature"] = temperature
             response = client.chat.completions.create(**request_kwargs)
@@ -544,6 +569,8 @@ def _call(config: ProviderConfig, content: list[dict], *, deadline: float | None
 
 
 def _timeline_content(frames: list[Frame], prompt: str) -> list[dict]:
+    if os.environ.get("CLIO_GRID_INPUT", "").lower() in {"1", "true", "yes"}:
+        return _timeline_grid_content(frames, prompt)
     if not frames:
         raise EvidencePipelineError("no frames")
     parts: list[dict] = [{"type": "text", "text": "Chronological labelled visual evidence follows."}]
@@ -553,6 +580,38 @@ def _timeline_content(frames: list[Frame], prompt: str) -> list[dict]:
         parts.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{data}"}})
     parts.append({"type": "text", "text": prompt})
     return parts
+
+
+def _timeline_grid_content(frames: list[Frame], prompt: str) -> list[dict]:
+    grids = build_timeline_grids(frames)
+    if not grids:
+        raise EvidencePipelineError("no frames")
+    parts: list[dict] = [{
+        "type": "text",
+        "text": (
+            "Chronological contact-sheet evidence follows. Each grid is ordered "
+            "left-to-right, top-to-bottom; labels F01, F02, and so on are annotations. "
+            "Black empty cells are padding and are not video content."
+        ),
+    }]
+    for index, grid in enumerate(grids, 1):
+        parts.append({"type": "text", "text": f"GRID {index}"})
+        parts.append({"type": "image_url", "image_url": {"url": grid}})
+    parts.append({"type": "text", "text": prompt})
+    return parts
+
+
+def _visual_content(frames: list[Frame], prompt: str) -> list[dict]:
+    if os.environ.get("CLIO_GRID_INPUT", "").lower() in {"1", "true", "yes"}:
+        return _timeline_grid_content(frames, prompt)
+    return _timeline_content(frames, prompt)
+
+
+def _caption_content(frames: list[Frame], prompt: str, config: ProviderConfig) -> list[dict]:
+    """Use text-only evidence for optional text caption models."""
+    if "deepseek" in config.model.lower():
+        return [{"type": "text", "text": prompt}]
+    return _timeline_content(frames, prompt)
 
 
 def _normalize(raw: str) -> str:
@@ -792,7 +851,7 @@ def _gemma_select_candidates(
     )
     raw = _call(
         config,
-        _timeline_content(frames, prompt),
+        _caption_content(frames, prompt, config),
         deadline=deadline,
         max_tokens=1100,
         temperature=0.15,
@@ -815,7 +874,7 @@ def _gemma_repair_captions(
     )
     raw = _call(
         config,
-        _timeline_content(frames, prompt),
+        _caption_content(frames, prompt, config),
         deadline=deadline,
         max_tokens=1100,
         temperature=0.1,
@@ -944,6 +1003,9 @@ def _role_model_config(config: ProviderConfig, env_name: str, role: str) -> Prov
 
 
 def _caption_model_config(config: ProviderConfig) -> ProviderConfig:
+    model = os.environ.get("CLIO_CAPTION_MODEL", "").strip()
+    if "deepseek" in model.lower() and os.environ.get("CLIO_ALLOW_NON_GEMMA_CAPTION", "").lower() in {"1", "true", "yes"}:
+        return replace(config, model=model)
     return _role_model_config(config, "CLIO_CAPTION_MODEL", "caption")
 
 
@@ -1076,7 +1138,7 @@ def _write_verified3_style(
     temperature = 0.12 if style == "formal" else (
         0.78 if reference_calibrated else (0.65 if concise else (0.70 if champion else (0.82 if persona_mode else 0.7)))
     )
-    content = _timeline_content(frames, prompt) if frames else [{"type": "text", "text": prompt}]
+    content = _caption_content(frames, prompt, config) if frames else [{"type": "text", "text": prompt}]
     caption = _normalize(
         _call(
             config,
@@ -1102,7 +1164,7 @@ def _write_verified3_style(
         repaired = _normalize(
             _call(
                 config,
-                _timeline_content(frames, repair_prompt) if frames else [{"type": "text", "text": repair_prompt}],
+                _caption_content(frames, repair_prompt, config) if frames else [{"type": "text", "text": repair_prompt}],
                 deadline=deadline,
                 max_tokens=240,
                 temperature=0.25,

@@ -1,18 +1,22 @@
-# Current release review - score-max R5 candidate
+# Current release review - source-derived R6/R8 candidates
 
-**Updated:** 2026-07-12
+**Updated:** 2026-07-13
 
 **Track:** AMD Developer Hackathon ACT II, Track 2 - Video Captioning
 
-**Production policy:** Novita provider; Kimi evidence/candidate generation; Gemma 4 verification, selection, and repair; no separate external judge
+**Production policy:** Novita provider; immutable, separately tagged candidates; no separate external judge
 
 ## Executive decision
 
-Submit this exact tested candidate:
+There are two separately tagged candidates:
 
-`ghcr.io/tuancookiez-hub/cliogemma:score-max-r5`
+Gemma-track control: `ghcr.io/tuancookiez-hub/cliogemma:score-max-r6-grid`
 
-Digest: `sha256:b1fe388ebf6ebfd2b0d0326adecf46be82578a47679ba8931ea98894e5c97156`
+Digest: `sha256:2d7eac8954a5a8831608886f6398084086d82ac8016c228e8cc5d51f4f1154e8`
+
+Source-derived broad Track 2 candidate: `ghcr.io/tuancookiez-hub/cliogemma:score-max-r8-qwen-deepseek`
+
+Digest: `sha256:e10362b03f5527a6a32e31119331f2a3ecee78bf60cbc8c04cb7e04775b19418`
 
 The latest confirmed ClioGemma score is **0.77**. The strongest confirmed
 control is **0.85**, earned by the older four-frame `verified5` architecture.
@@ -39,6 +43,8 @@ with 32/32 captions and anonymous GHCR manifest HTTP 200 verification.
 | `gemma4-kimi-batch-r1` | Kimi eight-frame evidence, Gemma verification, Gemma batch writing and final revision | Pending |
 | `gemma4-reference-r3` | Kimi five-frame dense evidence, dedicated reference-calibrated Gemma writers, targeted deterministic gates, no global rewrite | **0.77** |
 | `score-max-r5` | Scene-aware six frames, OCR hints, Kimi evidence plus two candidates per style, Gemma verification/selection/repair | Pending |
+| `score-max-r6-grid` | Up-to-16-frame chronological 4x4 grids, Kimi evidence, Gemma verification/selection/repair | Not yet scored |
+| `score-max-r8-qwen-deepseek` | Qwen3.5 chronological grids, Gemma verification/final grounding, DeepSeek V4 Pro style drafting | Not yet scored |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.
@@ -70,24 +76,23 @@ outputs were valid, but the official **0.59** score shows that local contract
 success is not enough. The likely failure mode is verbose or over-clever prose
 that missed the hidden judge's preference for short, directly visible captions.
 
-## Champion architecture
+## Source-derived candidate architecture
 
 ```text
 /input/tasks.json
-  -> download, ffprobe, and chronological FFmpeg sampling
-  -> scene-aware six 768px chronological frames plus optional local OCR
-  -> Kimi K2.6 observer: scene, subjects, stable facts, timeline, visible text,
-     and do-not-claim ledger
-  -> Gemma 4 second visual observer removes unsupported evidence
-  -> Kimi K2.6 creates two grounded candidates per style
-  -> Gemma 4 selects and repairs the four final captions
+  -> download, ffprobe, and chronological scene-aware sampling
+  -> up to 16 frames are packed into labelled 4x4 contact sheets
+  -> Kimi K2.6 (r6) or Qwen3.5 (r8) records scene, subjects, facts, timeline,
+     visible text, and a do-not-claim ledger
+  -> Gemma 4 verifies evidence and performs final grounding
+  -> r6 keeps Gemma for selection and repair; r8 uses DeepSeek V4 Pro for
+     independent style drafting before Gemma's final grounding pass
   -> deterministic schema, length, style, and hallucination guard
   -> atomic /output/results.json after every completed task
 ```
 
-All provider calls use Novita. Kimi K2.6 is restricted to visual evidence and
-candidate generation; Gemma 4 31B remains responsible for verification,
-selection, repairs, and every emitted caption. There is no Claude, audio model,
+All provider calls use Novita. r6 is the Gemma-track control; r8 is the
+source-derived broad Track 2 candidate. There is no Claude, audio model,
 external scoring judge, or hardcoded evaluator answer.
 
 ## Improvements beyond the 0.85 image
@@ -129,29 +134,32 @@ Repository validation:
 - `python -m compileall -q app tests`: passed
 - `git diff --check`: passed
 
-Exact score-max r5 image on all eight retired AMD videos:
+Source-derived candidate runs on all eight retired AMD videos:
 
 - 8/8 tasks
 - 32/32 requested captions
 - valid style keys and non-empty values
 - exit code 0
-- 351.2 seconds at task parallelism two
+- r5 baseline: 351.2 seconds at task parallelism two
+- r6 grid: 8/8 and 32/32 within the 570-second contract
+- r8 Qwen/DeepSeek: 8/8 and 32/32 in 272.3 seconds at task parallelism three
 - no empty outputs or schema failures
 
 Published artifact validation:
 
 - public Linux/amd64 OCI manifest
 - anonymous registry request: HTTP 200
-- pulled digest: `sha256:b1fe388ebf6ebfd2b0d0326adecf46be82578a47679ba8931ea98894e5c97156`
+- r6 digest: `sha256:2d7eac8954a5a8831608886f6398084086d82ac8016c228e8cc5d51f4f1154e8`
+- r8 digest: `sha256:e10362b03f5527a6a32e31119331f2a3ecee78bf60cbc8c04cb7e04775b19418`
 - judge-style run with no source mount and no environment override
 - 8/8 retired tasks, 32/32 captions, valid schema, exit code 0
 
 ## Score assessment
 
-`score-max-r5` is the strongest locally validated candidate. Scene-aware six-frame
-sampling, Kimi evidence/candidate diversity, Gemma verification, and issue-triggered
-repair address the gaps exposed by the 0.77 r3 result. The exact image completed
-all eight retired clips in 351.2 seconds with 32/32 valid captions.
+The source-derived r6/r8 candidates address the leader's two largest gaps:
+dense chronological contact sheets and independent style writers. This is
+architectural evidence, not a forecast of the hidden score. The exact AMD
+judge remains the only source of an official 0.93+ result.
 
 There is still no defensible way to simulate the hidden AMD score exactly. The
 hidden clips, reference expectations, judge prompt, weighting, and stochastic
@@ -161,7 +169,8 @@ remains the target; only the hidden AMD judge can establish it.
 
 ## Next experiment policy
 
-1. Submit `score-max-r5` once and record its digest and official score.
+1. Pick one immutable tag: r6 for Gemma-track eligibility, or r8 for the
+   source-derived broad Track 2 route, and record its digest and official score.
 2. Do not mutate this tag. Every later experiment gets a new tag.
 3. If the score is below 0.90, inspect whether the failure is accuracy, style,
    or incomplete outputs before changing architecture. Do not resubmit the same
@@ -177,10 +186,10 @@ remains the target; only the hidden AMD judge can establish it.
 
 - [x] Track 2 input/output contract preserved.
 - [x] Linux/amd64 entrypoint and exact requested style keys preserved.
-- [x] Novita-only provider, Kimi evidence role, and Gemma-only caption writing enforced.
+- [x] Novita-only provider and separate Gemma-track versus broad Track 2 roles documented.
 - [x] Repository tests and compilation pass.
 - [x] All eight retired validation clips pass within the 570-second budget.
 - [x] Immutable public tag pushed.
 - [x] Anonymous pull access and manifest digest verified.
-- [x] Exact published r5 image passes the full eight-clip mounted input/output test.
+- [x] Published r6 and r8 images pass the full eight-clip mounted input/output test.
 - [ ] Submit the exact tag and record the official score.

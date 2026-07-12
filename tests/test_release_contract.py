@@ -25,6 +25,7 @@ from app.evidence_pipeline import (
     _verify_model_config,
 )
 from app.core.frames import Frame
+from app.core.grids import build_timeline_grids
 from app.core.provider import ProviderConfig
 from app.visual import run
 
@@ -133,9 +134,27 @@ def test_verified3_uses_first_middle_last_and_gemma_caption_model(monkeypatch: p
     monkeypatch.setenv("CLIO_VERIFY_MODEL", "google/gemma-4-31b-it")
     config = ProviderConfig("test", "https://api.novita.ai/openai", "google/gemma-3-27b-it", 25.0)
     assert _caption_model_config(config).model == "google/gemma-4-31b-it"
+    monkeypatch.setenv("CLIO_CAPTION_MODEL", "deepseek/deepseek-v4-pro")
+    monkeypatch.setenv("CLIO_ALLOW_NON_GEMMA_CAPTION", "1")
+    assert _caption_model_config(config).model == "deepseek/deepseek-v4-pro"
     assert _verify_model_config(config).model == "google/gemma-4-31b-it"
     monkeypatch.setenv("CLIO_VISION_MODEL", "moonshotai/kimi-k2.6")
     assert _vision_model_config(config).model == "moonshotai/kimi-k2.6"
+    monkeypatch.setenv("CLIO_VISION_MODEL", "qwen/qwen3.5-397b-a17b")
+    assert _vision_model_config(config).model == "qwen/qwen3.5-397b-a17b"
+
+
+def test_timeline_grid_preserves_chronological_capacity(tmp_path: Path) -> None:
+    from PIL import Image
+
+    frames = []
+    for index in range(17):
+        path = tmp_path / f"grid-{index}.jpg"
+        Image.new("RGB", (32, 24), (index, 80, 120)).save(path, format="JPEG")
+        frames.append(Frame(path, index, float(index)))
+    grids = build_timeline_grids(frames, cell_size=160)
+    assert len(grids) == 2
+    assert all(item.startswith("data:image/jpeg;base64,") for item in grids)
 
 
 def test_champion_profile_keeps_anchor_and_normalizes_final_caption(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
