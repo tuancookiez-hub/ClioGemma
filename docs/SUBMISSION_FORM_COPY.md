@@ -50,26 +50,22 @@ localhost URL.
 
 ### Docker image
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-champion-r1`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-kimi-batch-r1`
 
-Record the public digest after pushing this new tag. Do not reuse a digest from
-an older candidate.
+Digest: `sha256:a66cd000cfb8d416e0c23574801839ee7957affa2ab93cd47621e4be7e19eb14`
 
 ### Additional information
 
-> ClioGemma's submission image is a public `linux/amd64` container that follows the Track 2 contract: it reads `/input/tasks.json`, returns every requested caption style, writes valid `/output/results.json`, and exits cleanly. The production path uses four chronological FFmpeg anchors and Novita-hosted Google Gemma 4 for factual observation, independent visual verification, internal two-angle style drafting, one grounded persona-specific writer per style, and a final accuracy/style revision. It uses no non-Gemma caption writer, audio model, or hardcoded evaluator answer. The public Streamlit application is a human-facing demo; the AMD evaluator runs the Docker entrypoint. The restricted, revocable Track 2 credential is not stored in GitHub.
+> ClioGemma's submission image is a public `linux/amd64` container that follows the Track 2 contract: it reads `/input/tasks.json`, returns every requested caption style, writes valid `/output/results.json`, and exits cleanly. Kimi K2.6 is used only for chronological visual evidence; Google Gemma 4 performs the evidence verification, all four-style caption writing, internal selection, and final accuracy/style revision. The image uses no non-Gemma caption writer, audio model, or hardcoded evaluator answer. The public Streamlit application is a human-facing demo; the AMD evaluator runs the Docker entrypoint. The restricted, revocable Track 2 credential is not stored in GitHub.
 
-### Optional hybrid experiment
+### Gemma-only control
 
-For the general Track 2 experiment, an alternative public image uses Kimi K2.6
-for visual evidence and Gemma 4 for every caption writer and final revision:
+If you want the strictly Gemma-only variant, use:
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-kimi-grounded-p2-r3`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-champion-r6`
 
-Digest: `sha256:dbae1f1d3420c7394704a3ca4bee466951ef214818c42bd6eae86e0c2533b201`
-
-Use this only as a separate A/B experiment; the primary submission is the
-Gemma-only champion candidate.
+The public guide permits any Track 2 model, but this control keeps every model
+role on Gemma and is useful for a Gemma-specific prize entry.
 
 ## Final checklist
 

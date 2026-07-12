@@ -10,7 +10,7 @@
 
 Build and quality-test this new candidate before submitting:
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-champion-r1`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-kimi-batch-r1`
 
 The latest confirmed ClioGemma score is **0.75**. The strongest confirmed
 control is **0.85**, earned by the older four-frame `verified5` architecture.
@@ -31,6 +31,8 @@ runtime, and qualitative readiness; it does not prove a score above 0.92.
 | `gemma4-4f-verified5-balanced-p2-r2` | Four-frame verified5 path, restored detail/temperature, style quality guard | Pending |
 | `gemma4-4f-kimi-grounded-p2-r3` | Kimi K2.6 evidence, Gemma writers/final revision | Pending |
 | `gemma4-champion-r1` | Gemma-only four-frame path with internal best-of-two drafting, stock rejection, anchor-preserving fallbacks, and final accuracy/style revision | Pending |
+| `gemma4-champion-r6` | Gemma-only four-frame batch writer with label normalization | Pending |
+| `gemma4-kimi-batch-r1` | Kimi eight-frame evidence, Gemma verification, Gemma batch writing and final revision | Pending |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.
@@ -62,12 +64,12 @@ outputs were valid, but the official **0.59** score shows that local contract
 success is not enough. The likely failure mode is verbose or over-clever prose
 that missed the hidden judge's preference for short, directly visible captions.
 
-## Champion R1 architecture
+## Champion architecture
 
 ```text
 /input/tasks.json
   -> download, ffprobe, and chronological FFmpeg sampling
-  -> four 768px chronological anchors
+  -> four or eight 768px chronological anchors (profile-specific)
   -> Gemma 4 observer: scene, subjects, stable facts, timeline, scene story,
      conservative caption anchor, visible text, and do-not-claim ledger
   -> Gemma 4 second visual observer removes unsupported evidence
@@ -137,6 +139,11 @@ The champion image is a controlled attempt to recover the 0.85 Gemma-only
 architecture after the 0.75 submission. It keeps four-frame evidence and adds
 internal best-of-two drafting, stock-style rejection, anchor-preserving
 fallbacks, and a final accuracy/style pass.
+
+The separate `gemma4-kimi-batch-r1` profile is currently the strongest local
+retired-set candidate: Kimi supplies eight-frame evidence, while Gemma owns all
+verification and caption generation. Its strict proxy score was **0.759**;
+this is not an AMD score.
 
 There is still no defensible way to simulate the hidden AMD score exactly. The
 hidden clips, reference expectations, judge prompt, weighting, and stochastic

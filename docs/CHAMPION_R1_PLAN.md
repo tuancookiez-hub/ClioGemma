@@ -92,3 +92,20 @@ This is a measured recovery candidate, not a guaranteed 0.93. The previous 0.75
 means the hidden judge is stricter than a lenient Gemma proxy. The immediate goal
 is to recover and exceed the confirmed 0.85 control; only an official submission
 can establish whether the additional style selection is enough to approach 0.93.
+
+## Live self-check results
+
+The exact published variants completed all eight retired clips with valid output:
+
+| Tag | Frames | Runtime | Strict Kimi proxy | Notes |
+|---|---:|---:|---:|---|
+| `gemma4-champion-r1` | 4 | 309.5 s | 0.708 (earlier proxy) | Generic tech fallbacks remained. |
+| `gemma4-champion-r2` | 4 | 191.6 s | 0.728 | Cleaner fallbacks; style remained conservative. |
+| `gemma4-champion-r3` | 8 | 326.7 s | not used as final control | More temporal detail, but transient-action drift appeared. |
+| `gemma4-champion-r6` | 4 | 247.2 s | 0.723 | Gemma batch writer; label leakage fixed. |
+| `gemma4-kimi-batch-r1` | 8 | 269.8 s | **0.759** | Kimi evidence plus Gemma batch writer/final revision; strongest local candidate. |
+
+The Gemma proxy gave much higher values (0.96+), so the two proxy judges are
+not calibrated to one another. Neither reproduces AMD's hidden evaluator. The
+strongest candidate to test officially is `gemma4-kimi-batch-r1`; retain
+`gemma4-champion-r6` as the Gemma-only control.

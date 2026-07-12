@@ -79,18 +79,23 @@ built and pushed with the user's revocable Novita key before submission.
 See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
 score diagnosis, competitor evidence, provenance caveats, and experiment plan.
 
-## Hybrid diagnostic candidate
+## Highest-scoring local candidate
 
-The Track 2 guide permits any model, so a separately published diagnostic uses
-Kimi K2.6 only for visual evidence and keeps Gemma 4 for every caption writer
-and final revision:
+The Track 2 guide permits any model. The strongest local retired-set proxy is
+the Kimi-grounded Gemma batch profile:
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-kimi-grounded-p2-r3`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-kimi-batch-r1`
 
-Digest: `sha256:dbae1f1d3420c7394704a3ca4bee466951ef214818c42bd6eae86e0c2533b201`
+Digest: `sha256:a66cd000cfb8d416e0c23574801839ee7957affa2ab93cd47621e4be7e19eb14`
 
-See [docs/MODEL_AB_COMPARISON.md](docs/MODEL_AB_COMPARISON.md) before choosing
-between the Gemma-only control and this hybrid experiment.
+Kimi is used only for eight-frame visual evidence; Gemma performs evidence
+verification, all caption writing, internal selection, and final revision. The
+strict local proxy measured 0.759, while the Gemma proxy was much more lenient;
+only AMD can decide the official score. The strictly Gemma-only control remains
+`gemma4-champion-r6`.
+
+See [docs/MODEL_AB_COMPARISON.md](docs/MODEL_AB_COMPARISON.md) and
+[docs/CHAMPION_R1_PLAN.md](docs/CHAMPION_R1_PLAN.md) for the A/B evidence.
 
 ## Streamlit demo
 
