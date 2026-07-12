@@ -11,6 +11,7 @@ from app.evidence_pipeline import (
     _caption_batch_issues,
     _caption_model_config,
     _candidate_quality_issues,
+    _deterministic_verified_caption,
     _eight_anchor_frames,
     _four_anchor_frames,
     _parse_verified_evidence,
@@ -93,6 +94,17 @@ def test_verified_evidence_parser_and_style_guard() -> None:
     }
     issues = _caption_batch_issues(captions)
     assert "humorous_non_tech" in issues
+    assert "stock style formula" in _caption_batch_issues({
+        "formal": "A train travels beside a platform while trees line the railway in the background.",
+        "sarcastic": "A train travels beside a platform, because apparently rails remain its preferred route today.",
+        "humorous_tech": "A train travels beside a platform, like a software task waiting on one visible input.",
+        "humorous_non_tech": "A train travels beside a platform with an unexpectedly dramatic sense of purpose.",
+    })["humorous_tech"]
+    fallback = _deterministic_verified_caption(
+        "humorous_tech",
+        {"caption_anchor": "A train travels beside a platform"},
+    )
+    assert "train" in fallback.lower() and "scheduler" in fallback.lower()
 
 
 def test_verified3_uses_first_middle_last_and_gemma_caption_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -108,3 +120,54 @@ def test_verified3_uses_first_middle_last_and_gemma_caption_model(monkeypatch: p
     assert _verify_model_config(config).model == "google/gemma-4-31b-it"
     monkeypatch.setenv("CLIO_VISION_MODEL", "moonshotai/kimi-k2.6")
     assert _vision_model_config(config).model == "moonshotai/kimi-k2.6"
+
+
+def test_champion_profile_keeps_anchor_and_normalizes_final_caption(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import app.evidence_pipeline as pipeline
+
+    frames = []
+    for index in range(4):
+        path = tmp_path / f"{index}.jpg"
+        path.write_bytes(b"frame")
+        frames.append(Frame(path, index, float(index)))
+
+    evidence = {
+        "scene": "street",
+        "subjects": ["train"],
+        "stable_facts": ["a train is visible", "a platform is visible"],
+        "timeline": ["beginning: train beside platform"],
+        "scene_story": "A train remains beside a platform.",
+        "caption_anchor": "A train travels beside a platform",
+        "visible_text": [],
+        "do_not_claim": [],
+    }
+
+    def fake_call(config, content, *, deadline, max_tokens, temperature):
+        prompt = " ".join(str(part.get("text", "")) for part in content if part.get("type") == "text")
+        if "Perform one final image-grounded revision" in prompt:
+            return json.dumps({
+                "formal": "a train travels beside a platform at a visible station structure in an outdoor setting.",
+                "sarcastic": "A train travels beside a platform, because apparently rails remain popular today.",
+                "humorous_tech": "A train travels beside a platform, like a packet following a stable network route.",
+                "humorous_non_tech": "A train travels beside a platform, like someone taking the long way home on purpose.",
+            })
+        if "Return a conservative JSON evidence record" in prompt:
+            return json.dumps(evidence)
+        if "Act as a strict second visual observer" in prompt:
+            return json.dumps(evidence)
+        if "humorous_tech" in prompt:
+            return "A train travels beside a platform, like a packet following a stable network route."
+        if "humorous_non_tech" in prompt:
+            return "A train travels beside a platform, like someone taking the long way home on purpose."
+        if "sarcastic" in prompt:
+            return "A train travels beside a platform, because apparently rails remain popular today."
+        return "A train travels beside a platform at a visible station structure in an outdoor setting."
+
+    monkeypatch.setattr(pipeline, "_call", fake_call)
+    monkeypatch.setenv("CLIO_PIPELINE", "verified5-champion")
+    monkeypatch.setenv("CLIO_ENFORCE_NOVITA", "1")
+    config = ProviderConfig("test", "https://api.novita.ai/openai", "google/gemma-4-31b-it", 25.0)
+    result = pipeline._caption_clip_verified3(frames, "champion-test", config, None)
+    assert result["formal"].startswith("A train travels")
+    assert "packet" in result["humorous_tech"]
+    assert not pipeline._caption_batch_issues(result)

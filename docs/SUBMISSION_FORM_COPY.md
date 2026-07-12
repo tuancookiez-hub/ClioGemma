@@ -50,15 +50,14 @@ localhost URL.
 
 ### Docker image
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-balanced-p2-r2`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-champion-r1`
 
-Verified public digest:
-
-`sha256:9dcc777f1e80256fecee64fbfa3f105f549e5b0e38c3f9100098ec21fefe824f`
+Record the public digest after pushing this new tag. Do not reuse a digest from
+an older candidate.
 
 ### Additional information
 
-> ClioGemma's submission image is a public `linux/amd64` container that follows the Track 2 contract: it reads `/input/tasks.json`, returns every requested caption style, writes valid `/output/results.json`, and exits cleanly. The production path uses four chronological FFmpeg anchors and Novita-hosted Google Gemma 4 for factual observation, independent visual verification, one grounded persona-specific writer per style, and a final grounding revision. It uses no external judge, non-Gemma caption writer, audio model, or hardcoded evaluator answer. The exact balanced source completed all eight retired validation videos with 32/32 captions, and the pulled public artifact passed a separate mounted input/output run with 2/2 tasks and 8/8 captions. The public Streamlit application is a human-facing demo; the AMD evaluator runs the Docker entrypoint. The restricted, revocable Track 2 credential is not stored in GitHub.
+> ClioGemma's submission image is a public `linux/amd64` container that follows the Track 2 contract: it reads `/input/tasks.json`, returns every requested caption style, writes valid `/output/results.json`, and exits cleanly. The production path uses four chronological FFmpeg anchors and Novita-hosted Google Gemma 4 for factual observation, independent visual verification, internal two-angle style drafting, one grounded persona-specific writer per style, and a final accuracy/style revision. It uses no non-Gemma caption writer, audio model, or hardcoded evaluator answer. The public Streamlit application is a human-facing demo; the AMD evaluator runs the Docker entrypoint. The restricted, revocable Track 2 credential is not stored in GitHub.
 
 ### Optional hybrid experiment
 
@@ -69,15 +68,15 @@ for visual evidence and Gemma 4 for every caption writer and final revision:
 
 Digest: `sha256:dbae1f1d3420c7394704a3ca4bee466951ef214818c42bd6eae86e0c2533b201`
 
-Use this only after recording the Gemma-only control score; it has passed local
-eight-clip validation but has no official AMD score yet.
+Use this only as a separate A/B experiment; the primary submission is the
+Gemma-only champion candidate.
 
 ## Final checklist
 
-- [x] Push the exact public Linux/amd64 image tag above.
-- [x] Record its manifest digest.
-- [x] Pull it and verify anonymous manifest access.
-- [x] Run the exact published tag with mounted `/input` and `/output`.
+- [ ] Push the exact public Linux/amd64 image tag above.
+- [ ] Record its manifest digest.
+- [ ] Pull it and verify anonymous manifest access.
+- [ ] Run the exact published tag with mounted `/input` and `/output`.
 - [x] Confirm every task ID and requested style is present and non-empty.
 - [x] Push the current source and documentation to GitHub.
 - [ ] Enter the public Streamlit URL.

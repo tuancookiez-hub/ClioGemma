@@ -286,6 +286,12 @@ a weak generic sentence. Do not reward length. Return each selected candidate
 verbatim; do not merge or rewrite. Return JSON only with exactly four string
 keys: formal, sarcastic, humorous_tech, humorous_non_tech.
 
+Before returning, privately score each caption on two axes: (1) accuracy to the
+verified evidence and (2) strength of the requested style. Keep a caption that
+already passes both axes; revise only a real factual or style failure. Do not
+genericize a specific caption, and do not replace a visible action with a vague
+topic summary.
+
 VERIFIED EVIDENCE:
 {evidence}
 
@@ -465,6 +471,9 @@ def _style_issues(style: str, caption: str) -> list[str]:
         issues.append("awkward or incorrect tech analogy")
     if style == "humorous_non_tech" and hits:
         issues.append("technical jargon")
+    stock = _STOCK_STYLE.get(style)
+    if stock and stock.search(caption):
+        issues.append("stock style formula")
     if style == "formal" and ("!" in caption or "?" in caption):
         issues.append("formal punctuation")
     return issues
@@ -477,12 +486,14 @@ _STOCK_STYLE = {
         re.I,
     ),
     "humorous_tech": re.compile(
-        r"\b404\b|motivation not found|legacy (?:codebase|process)|total system crash",
+        r"\b404\b|motivation not found|legacy (?:codebase|process)|total system crash|"
+        r"software task waiting on one visible input|software task waiting on input",
         re.I,
     ),
     "humorous_non_tech": re.compile(
         r"\b(?:on a |every )?monday\b|what (?:to|i should) (?:eat|have) for dinner|"
-        r"walked into the kitchen|finish all my chores|three different snacks|same confidence as me",
+        r"walked into the kitchen|finish all my chores|three different snacks|same confidence as me|"
+        r"unexpectedly dramatic sense of purpose",
         re.I,
     ),
 }
@@ -726,6 +737,12 @@ def _write_verified3_style(
         if style != "formal"
         else "The verified evidence is a hard ceiling; every statement must be literal and supported. "
     )
+    internal_selection = (
+        " Before answering, silently draft two different angles, delete any detail not in VERIFIED EVIDENCE, "
+        "and return only the sharper, more natural survivor."
+        if balanced
+        else ""
+    )
     length_rule = (
         "Aim for 18-30 words, hard bounds 14-34, with one crisp factual sentence"
         if style == "formal"
@@ -750,6 +767,14 @@ def _write_verified3_style(
             "humorous_non_tech: state the visible situation first, then use one relatable everyday comparison suggested by the scene.\n"
             "Prefer a complete, natural caption with concrete detail over a compressed fragment or a stack of jokes. Make the punchline hinge on the visible action, not just the topic. Never invent numeric quantities, durations, names, locations, or literal unseen outcomes, even in a joke."
         )
+    if balanced:
+        calibration += (
+            "\nUse these shape patterns only; never copy their facts: "
+            "formal = visible subject/action + setting + one detail; "
+            "sarcastic = literal scene + one dry contrast; "
+            "humorous_tech = literal scene + one apt software analogy; "
+            "humorous_non_tech = literal scene + one everyday comparison."
+        )
     prompt = (
         _VERIFIED3_STYLE_PROMPTS[style]
         + calibration
@@ -757,6 +782,7 @@ def _write_verified3_style(
         + creative_rule
         + length_rule
         + ", use one or two concise sentences, never mention frames or analysis, and output only the caption text."
+        + internal_selection
         + anchor_note
         + prior_note
         + "\n\nVERIFIED EVIDENCE:\n"
@@ -782,7 +808,7 @@ def _write_verified3_style(
         prompt
         + "\n\nYour previous caption failed these mechanical checks: "
         + "; ".join(issues)
-        + ". Rewrite it without adding facts. Output only the corrected caption.\n\nPREVIOUS CAPTION:\n"
+        + ". Rewrite it without adding facts. Keep the verified anchor's subject/action in the sentence, and keep the requested style unmistakable. Output only the corrected caption.\n\nPREVIOUS CAPTION:\n"
         + caption
     )
     try:
@@ -854,9 +880,9 @@ def _deterministic_verified_caption(style: str, evidence: dict) -> str:
                     return f"{anchor.rstrip('.?!')}. {detail}."
         return f"{anchor.rstrip('.?!')}."
     endings = {
-        "sarcastic": "and apparently this ordinary scene has decided to demand our full attention.",
-        "humorous_tech": "like a software task waiting on one visible input.",
-        "humorous_non_tech": "with an unexpectedly dramatic sense of purpose.",
+        "sarcastic": "and apparently this ordinary scene has decided to become today's main event.",
+        "humorous_tech": "like a scheduler managing one very visible queue.",
+        "humorous_non_tech": "with the determined focus of someone handling an unexpectedly important errand.",
     }
     return f"{anchor}, {endings[style]}"
 
@@ -864,10 +890,23 @@ def _deterministic_verified_caption(style: str, evidence: dict) -> str:
 def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
-    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi"}
-    balanced_mode = pipeline in {"verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi"}
-    persona_mode = pipeline in {"verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "persona", "persona-grounded"}
-    anchors = _four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames)
+    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8"}
+    hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8"}
+    balanced_mode = pipeline in {
+        "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
+        "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi",
+        "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion",
+        "champion-r3", "gemma-champion",
+    }
+    persona_mode = pipeline in {
+        "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise",
+        "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
+        "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8",
+        "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion",
+        "persona", "persona-grounded",
+    }
+    eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8"}
+    anchors = _eight_anchor_frames(frames) if eight_frame_mode else (_four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames))
     draft_config = _vision_model_config(config) if hybrid_mode else config
     try:
         draft_raw = _call(
@@ -882,7 +921,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
         _log(f"verified3 evidence stage failed; using direct grounded generation: {error}")
         return _caption_clip_fast(anchors, task_id, config, deadline)
     verify_config = _verify_model_config(config)
-    if hybrid_mode:
+    if hybrid_mode and not hybrid_verified_mode:
         evidence = draft
     else:
         review_prompt = _VERIFIED3_REVIEW_PROMPT + json.dumps(draft, ensure_ascii=False, indent=2)
@@ -918,7 +957,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
             caption = _deterministic_verified_caption(style, evidence)
         captions[style] = caption
         prior.append(caption)
-    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "persona", "persona-grounded"}:
+    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "persona", "persona-grounded"}:
         final_prompt = _VERIFIED4_FINAL_PROMPT.format(
             evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
             captions=json.dumps(captions, ensure_ascii=False, indent=2),
@@ -942,7 +981,11 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                 max_tokens=900,
                 temperature=0.1,
             )
-            reviewed = _parse_fast(reviewed_raw)
+            reviewed = {style: _normalize(text) for style, text in _parse_fast(reviewed_raw).items()}
+            reviewed = {
+                style: (text[:1].upper() + text[1:] if text and text[0].islower() else text)
+                for style, text in reviewed.items()
+            }
             anchor = str(evidence.get("caption_anchor", ""))
             concise_ok = all(
                 14 <= len(text.split()) <= (34 if style == "formal" else 32)
@@ -1084,7 +1127,9 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
         "verified5", "verified-5", "verified5-concise", "verified-5-concise",
         "precision", "concise", "verified5-balanced", "verified-5-balanced",
         "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi",
-        "kimi-grounded", "hybrid-kimi", "persona", "persona-grounded",
+        "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8",
+        "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion",
+        "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline)
     if pipeline in {"verified2", "verified-2", "two-stage"}:

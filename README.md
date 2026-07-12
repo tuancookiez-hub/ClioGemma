@@ -5,23 +5,24 @@ ClioGemma is a Dockerized video-captioning agent. It reads
 with the requested `formal`, `sarcastic`, `humorous_tech`, and
 `humorous_non_tech` captions.
 
-The current confirmed leaderboard score is **0.85**. That score belongs to the
-older four-frame `verified5` image. The eight-frame pairs/selector experiment
-was submitted separately and scored **0.59**, so it is retained only as a
-failed experiment. The concise four-frame candidate scored **0.72**. The
-balanced four-frame candidate below is the current release candidate.
+The latest confirmed leaderboard score is **0.75**. The strongest confirmed
+control remains **0.85** from the older four-frame `verified5` image. The
+eight-frame pairs/selector experiment scored **0.59**, and the concise
+four-frame candidate scored **0.72**. The current work is a new measured
+Gemma-only recovery candidate; it is not being presented as a guaranteed 0.93.
 
 ## Current candidate
 
-The next release candidate is Novita-only and Gemma-only:
+The next release candidate is Novita-only and Gemma-only (`verified5-champion`):
 
 ```text
 video
   -> four chronological visual anchors
   -> Gemma 4 factual evidence record with an explicit do-not-claim ledger
   -> second Gemma 4 visual verification pass
-  -> one direct multimodal writer per style with balanced style calibration
-  -> Gemma 4 final visual grounding revision
+  -> one direct multimodal writer per style; Gemma internally drafts two angles
+     and keeps the sharper grounded survivor
+  -> Gemma 4 final accuracy/style revision
   -> deterministic schema, length, cliché, and style validation
   -> /output/results.json
 ```
@@ -32,8 +33,8 @@ image. The observer, verifier, persona writers, and final revision all use
 
 This architecture keeps the proven evidence/verification path and restores the
 original detail and creative range that produced the 0.85 control score. It
-adds evaluator-aligned style checks and rejects invented numbers, durations,
-names, locations, and literal unseen outcomes.
+adds evaluator-aligned style checks, rejects stock formulas before fallback,
+and preserves the verified anchor in every deterministic fallback.
 
 ## Build the leaderboard candidate
 
@@ -46,11 +47,11 @@ docker buildx build --platform linux/amd64 `
   --build-arg CLIO_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_VERIFY_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_CAPTION_MODEL=google/gemma-4-31b-it `
-  --build-arg CLIO_PIPELINE=verified5-balanced `
+  --build-arg CLIO_PIPELINE=verified5-champion `
   --build-arg SWIFTCLIP_FRAME_COUNT=4 `
   --build-arg SWIFTCLIP_FRAME_WIDTH=768 `
   --build-arg SWIFTCLIP_PARALLEL=2 `
-  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-balanced-p2-r2 `
+  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-champion-r1 `
   --push .
 ```
 
@@ -71,10 +72,9 @@ rotate it after judging; never commit it to Git.
 These are reliability and qualitative checks, not a substitute for the hidden
 AMD score. Only the leaderboard can confirm a score above 0.92.
 
-Published candidate:
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-verified5-balanced-p2-r2`
-
-Digest: `sha256:9dcc777f1e80256fecee64fbfa3f105f549e5b0e38c3f9100098ec21fefe824f`
+The source changes for this candidate are documented in
+[docs/CHAMPION_R1_PLAN.md](docs/CHAMPION_R1_PLAN.md). The public image must be
+built and pushed with the user's revocable Novita key before submission.
 
 See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
 score diagnosis, competitor evidence, provenance caveats, and experiment plan.
