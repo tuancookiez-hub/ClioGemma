@@ -159,8 +159,14 @@ queue, packet, deployment, or workplace jokes unless the mapping is precise.
 humorous_non_tech: state the literal scene first, then one relatable everyday
 comparison with no technical jargon or invented backstory.
 
+Useful shape patterns (never copy their facts): sarcastic can use "Ah yes, ...";
+humorous-tech can use "When the visible action behaves like ..."; humorous-
+non-tech can use "When the visible scene ...". The literal scene must remain
+specific before the punchline.
+
 Never leave a quote or sentence unfinished. Do not add names, locations,
 numbers, motives, relationships, audio, or unseen outcomes. Output JSON only.
+Do not prefix any value with labels such as "Caption_anchor" or "formal:".
 
 VERIFIED EVIDENCE:
 {evidence}"""
@@ -216,7 +222,7 @@ keys:
   "stable_facts": ["concrete facts directly supported by the images"],
   "timeline": ["beginning: ...", "middle: ...", "end: ..."],
   "scene_story": "two dense factual sentences covering how the clip begins, develops, and ends",
-  "caption_anchor": "one complete present-tense sentence of 6-14 words stating the persistent visible subject, setting, or main state; capitalize it; prefer the scene over a transient motion or camera movement; do not join two actions with and",
+  "caption_anchor": "one complete present-tense sentence of 6-14 words stating the persistent visible subject, setting, or main state; capitalize it; prefer the scene over a transient motion or camera movement; for an animal or athlete merely passing through, describe the visible subject and setting instead of asserting a journey; do not join two actions with and",
   "visible_text": ["only large, central, unquestionably readable text"],
   "do_not_claim": ["plausible but unsupported identities, actions, counts, motives, relationships, brands, locations, audio, or outcomes"]
 }
@@ -437,7 +443,7 @@ def _normalize(raw: str) -> str:
     if fenced:
         text = fenced.group(1).strip()
     text = re.sub(r"(?:\*\*|__|`)", "", text)
-    text = re.sub(r"^(?:caption[_ ]?anchor|caption)\s*[:\-]\s*", "", text, flags=re.I)
+    text = re.sub(r"^(?:caption[_ ]?anchor|caption)\s*(?:[:\-]\s*)?", "", text, flags=re.I)
     return re.sub(r"\s+", " ", text).strip(" \t\"'")
 
 
@@ -953,14 +959,15 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
     champion_mode = pipeline in {"verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "champion-r2"}
-    batch_mode = pipeline in {"champion-batch", "gemma-champion-batch", "champion-r4"}
-    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8"}
-    hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8"}
+    batch_mode = pipeline in {"champion-batch", "gemma-champion-batch", "champion-r4", "hybrid-kimi-batch", "kimi-grounded-batch"}
+    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch"}
+    hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch"}
     balanced_mode = pipeline in {
         "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
         "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi",
         "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion",
         "champion-r3", "champion-r2", "gemma-champion", "champion-batch", "gemma-champion-batch", "champion-r4",
+        "hybrid-kimi-batch", "kimi-grounded-batch",
     }
     persona_mode = pipeline in {
         "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise",
@@ -968,9 +975,10 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
         "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8",
         "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion",
         "champion-r2", "champion-batch", "gemma-champion-batch", "champion-r4",
+        "hybrid-kimi-batch", "kimi-grounded-batch",
         "persona", "persona-grounded",
     }
-    eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "champion-r3"}
+    eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "champion-r3", "hybrid-kimi-batch", "kimi-grounded-batch"}
     anchors = _eight_anchor_frames(frames) if eight_frame_mode else (_four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames))
     draft_config = _vision_model_config(config) if hybrid_mode else config
     try:
@@ -1041,7 +1049,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                 caption = _deterministic_verified_caption(style, evidence)
             captions[style] = caption
             prior.append(caption)
-    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion", "champion-batch", "gemma-champion-batch", "champion-r4", "persona", "persona-grounded"}:
+    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion", "champion-batch", "gemma-champion-batch", "champion-r4", "persona", "persona-grounded"}:
         final_prompt = _VERIFIED4_FINAL_PROMPT.format(
             evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
             captions=json.dumps(captions, ensure_ascii=False, indent=2),
@@ -1230,6 +1238,7 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
         "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8",
         "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion",
         "champion-batch", "gemma-champion-batch", "champion-r4",
+        "hybrid-kimi-batch", "kimi-grounded-batch",
         "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline)
