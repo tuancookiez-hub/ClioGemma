@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 NOVITA_BASE_URL = "https://api.novita.ai/openai"
 NOVITA_GEMMA_MODELS = frozenset({"google/gemma-4-31b-it", "google/gemma-3-27b-it"})
+NOVITA_VISION_MODELS = frozenset({"moonshotai/kimi-k2.6"})
 
 
 class ProviderError(ValueError):

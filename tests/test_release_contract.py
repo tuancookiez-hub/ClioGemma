@@ -18,6 +18,7 @@ from app.evidence_pipeline import (
     _retry_delay,
     _retryable_status,
     _three_anchor_frames,
+    _vision_model_config,
     _verify_model_config,
 )
 from app.core.frames import Frame
@@ -105,3 +106,5 @@ def test_verified3_uses_first_middle_last_and_gemma_caption_model(monkeypatch: p
     config = ProviderConfig("test", "https://api.novita.ai/openai", "google/gemma-3-27b-it", 25.0)
     assert _caption_model_config(config).model == "google/gemma-4-31b-it"
     assert _verify_model_config(config).model == "google/gemma-4-31b-it"
+    monkeypatch.setenv("CLIO_VISION_MODEL", "moonshotai/kimi-k2.6")
+    assert _vision_model_config(config).model == "moonshotai/kimi-k2.6"

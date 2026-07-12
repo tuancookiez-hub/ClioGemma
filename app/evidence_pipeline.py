@@ -16,7 +16,7 @@ from openai import OpenAI
 
 from app.core.frames import Frame
 from app.core.parse import STYLES
-from app.core.provider import NOVITA_GEMMA_MODELS, ProviderConfig, provider_config
+from app.core.provider import NOVITA_GEMMA_MODELS, NOVITA_VISION_MODELS, ProviderConfig, provider_config
 
 
 class EvidencePipelineError(RuntimeError):
@@ -357,13 +357,17 @@ def _call(config: ProviderConfig, content: list[dict], *, deadline: float | None
     for attempt in range(retries + 1):
         timeout = _timeout(config, deadline)
         try:
-            response = client.chat.completions.create(
-                model=config.model,
-                messages=[{"role": "user", "content": content}],
-                max_tokens=max_tokens,
-                temperature=temperature,
-                timeout=timeout,
-            )
+            request_kwargs = {
+                "model": config.model,
+                "messages": [{"role": "user", "content": content}],
+                "max_tokens": max_tokens,
+                "timeout": timeout,
+            }
+            if config.model.lower() in {item.lower() for item in NOVITA_VISION_MODELS}:
+                request_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+            else:
+                request_kwargs["temperature"] = temperature
+            response = client.chat.completions.create(**request_kwargs)
             break
         except Exception as error:
             status = _retryable_status(error)
@@ -676,6 +680,15 @@ def _verify_model_config(config: ProviderConfig) -> ProviderConfig:
     return _role_model_config(config, "CLIO_VERIFY_MODEL", "verification")
 
 
+def _vision_model_config(config: ProviderConfig) -> ProviderConfig:
+    model = os.environ.get("CLIO_VISION_MODEL", "").strip() or config.model
+    if "gemma" in model.lower():
+        return replace(config, model=model)
+    if model.lower() not in {item.lower() for item in NOVITA_VISION_MODELS}:
+        raise EvidencePipelineError(f"Novita vision model must be Gemma or an allowed multimodal model: {model}")
+    return replace(config, model=model)
+
+
 def _write_verified3_style(
     style: str,
     evidence: dict,
@@ -844,12 +857,14 @@ def _deterministic_verified_caption(style: str, evidence: dict) -> str:
 def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
-    balanced_mode = pipeline in {"verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced"}
-    persona_mode = pipeline in {"verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "persona", "persona-grounded"}
+    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi"}
+    balanced_mode = pipeline in {"verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi"}
+    persona_mode = pipeline in {"verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "persona", "persona-grounded"}
     anchors = _four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames)
+    draft_config = _vision_model_config(config) if hybrid_mode else config
     try:
         draft_raw = _call(
-            config,
+            draft_config,
             _timeline_content(anchors, _VERIFIED3_DRAFT_PROMPT),
             deadline=deadline,
             max_tokens=650,
@@ -859,20 +874,23 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
     except Exception as error:
         _log(f"verified3 evidence stage failed; using direct grounded generation: {error}")
         return _caption_clip_fast(anchors, task_id, config, deadline)
-    review_prompt = _VERIFIED3_REVIEW_PROMPT + json.dumps(draft, ensure_ascii=False, indent=2)
     verify_config = _verify_model_config(config)
-    try:
-        verified_raw = _call(
-            verify_config,
-            _timeline_content(anchors, review_prompt),
-            deadline=deadline,
-            max_tokens=650,
-            temperature=0.05,
-        )
-        evidence = _parse_verified_evidence(verified_raw)
-    except Exception as error:
-        _log(f"verified3 second observer unavailable; retaining first evidence record: {error}")
+    if hybrid_mode:
         evidence = draft
+    else:
+        review_prompt = _VERIFIED3_REVIEW_PROMPT + json.dumps(draft, ensure_ascii=False, indent=2)
+        try:
+            verified_raw = _call(
+                verify_config,
+                _timeline_content(anchors, review_prompt),
+                deadline=deadline,
+                max_tokens=650,
+                temperature=0.05,
+            )
+            evidence = _parse_verified_evidence(verified_raw)
+        except Exception as error:
+            _log(f"verified3 second observer unavailable; retaining first evidence record: {error}")
+            evidence = draft
     caption_config = _caption_model_config(config)
     captions: dict[str, str] = {}
     prior: list[str] = []
@@ -893,7 +911,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
             caption = _deterministic_verified_caption(style, evidence)
         captions[style] = caption
         prior.append(caption)
-    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "persona", "persona-grounded"}:
+    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "persona", "persona-grounded"}:
         final_prompt = _VERIFIED4_FINAL_PROMPT.format(
             evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
             captions=json.dumps(captions, ensure_ascii=False, indent=2),
@@ -931,6 +949,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
         {
             "mode": pipeline or "verified3",
             "vision_model": config.model,
+            "draft_model": draft_config.model,
             "verification_model": verify_config.model,
             "caption_model": caption_config.model,
             "draft": draft,
@@ -1056,7 +1075,8 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
         "verified4", "verified-4", "champion",
         "verified5", "verified-5", "verified5-concise", "verified-5-concise",
         "precision", "concise", "verified5-balanced", "verified-5-balanced",
-        "stylecal", "rebalanced", "persona", "persona-grounded",
+        "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi",
+        "kimi-grounded", "hybrid-kimi", "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline)
     if pipeline in {"verified2", "verified-2", "two-stage"}:
