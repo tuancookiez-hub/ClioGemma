@@ -149,9 +149,14 @@ Silently draft two alternatives for each style, remove every unsupported literal
 detail, then return only the strongest survivor. Keep each caption 16-30 words,
 natural, complete, and specific to the visible scene.
 
-formal: objective and professional; describe the persistent subject, setting,
-main action or state, and one or two unmistakable details. Do not mention camera
-movement or peripheral accessories unless central.
+Base all four captions on the dominant persistent scene or action across the
+sequence. If a person, animal, or vehicle appears only briefly in one timeline
+moment, do not make it the subject; describe the stable environment instead.
+
+formal: objective and professional; describe only the persistent subject,
+setting, main action or state, and one central object. Do not mention hairstyle,
+age, ethnicity, clothing, camera movement, distant scenery, or peripheral
+accessories unless they are the entire point of the clip.
 sarcastic: state the literal scene first, then one dry contrast or understated
 payoff. Keep it accurate and unmistakably sarcastic.
 humorous_tech: state the literal scene first, then exactly one clever software
@@ -160,10 +165,12 @@ queue, packet, deployment, or workplace jokes unless the mapping is precise.
 humorous_non_tech: state the literal scene first, then one relatable everyday
 comparison with no technical jargon or invented backstory.
 
-Useful shape patterns (never copy their facts): sarcastic can use "Ah yes, ...";
-humorous-tech can use "When the visible action behaves like ..."; humorous-
-non-tech can use "When the visible scene ...". The literal scene must remain
-specific before the punchline.
+Useful shape patterns: sarcastic may use "Ah yes" before one dry contrast;
+humorous-tech names the real subject/action and maps it directly to one familiar
+technical concept; humorous-non-tech names the real subject/action and adds one
+ordinary-life comparison. Never write meta phrases such as "the visible action",
+"the visible scene", "the subject", or "the requested style". The caption must
+sound like something a person would actually post.
 
 Never leave a quote or sentence unfinished. Do not add names, locations,
 numbers, motives, relationships, audio, or unseen outcomes. Output JSON only.
@@ -462,7 +469,8 @@ _SPECULATIVE = re.compile(
 )
 _PROCESS = re.compile(
     r"\b(camera|sampling|model|prompt|analysis|detection|uncertain(?:ty)?|"
-    r"image quality|jpe?g|pixels?|camera footage|computer vision)\b",
+    r"image quality|jpe?g|pixels?|camera footage|computer vision|"
+    r"visible action|visible scene|requested style)\b",
     re.I,
 )
 _RELATIONSHIP = re.compile(
@@ -599,7 +607,14 @@ def _timeline_content(frames: list[Frame], prompt: str) -> list[dict]:
 
 
 def _timeline_grid_content(frames: list[Frame], prompt: str) -> list[dict]:
-    grids = build_timeline_grids(frames)
+    # Avoid a mostly-empty 4x4 sheet on the latency-optimized five-frame path.
+    # A 3x2 sheet keeps every frame large while remaining one image request.
+    if len(frames) <= 6:
+        grids = build_timeline_grids(frames, cols=3, rows=2)
+    elif len(frames) <= 8:
+        grids = build_timeline_grids(frames, cols=4, rows=2)
+    else:
+        grids = build_timeline_grids(frames)
     if not grids:
         raise EvidencePipelineError("no frames")
     parts: list[dict] = [{
@@ -1278,13 +1293,14 @@ def _caption_clip_verified3(
     ocr_text: list[str] | None = None,
 ) -> dict[str, str]:
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
+    fast_batch_mode = pipeline in {"fast-kimi-gemma", "kimi-gemma-fast"}
     score_max_mode = pipeline in {"score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
-    reference_mode = pipeline in {"hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
+    reference_mode = pipeline in {"hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1", "fast-kimi-gemma", "kimi-gemma-fast"}
     gemma_reference_mode = pipeline in {"gemma-reference", "reference-gemma-r1"}
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
     champion_mode = pipeline in {"verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "champion-r2"}
-    batch_mode = pipeline in {"champion-batch", "gemma-champion-batch", "champion-r4", "hybrid-kimi-batch", "kimi-grounded-batch"}
-    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "hybrid-kimi-reference", "reference-r1", "score-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
+    batch_mode = fast_batch_mode or pipeline in {"champion-batch", "gemma-champion-batch", "champion-r4", "hybrid-kimi-batch", "kimi-grounded-batch"}
+    hybrid_mode = fast_batch_mode or pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "hybrid-kimi-reference", "reference-r1", "score-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
     hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
     balanced_mode = pipeline in {
         "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
@@ -1294,6 +1310,7 @@ def _caption_clip_verified3(
         "hybrid-kimi-batch", "kimi-grounded-batch",
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
+        "fast-kimi-gemma", "kimi-gemma-fast",
     }
     persona_mode = pipeline in {
         "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise",
@@ -1304,14 +1321,20 @@ def _caption_clip_verified3(
         "hybrid-kimi-batch", "kimi-grounded-batch",
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
+        "fast-kimi-gemma", "kimi-gemma-fast",
         "persona", "persona-grounded",
     }
     eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "champion-r3", "hybrid-kimi-batch", "kimi-grounded-batch"}
-    anchors = frames if score_max_mode else (_five_anchor_frames(frames) if reference_mode and not gemma_reference_mode else (
+    anchors = frames if (score_max_mode or fast_batch_mode) else (_five_anchor_frames(frames) if reference_mode and not gemma_reference_mode else (
         _eight_anchor_frames(frames) if eight_frame_mode else (_four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames))
     ))
     draft_config = _vision_model_config(config) if hybrid_mode else config
-    grounding_prompt = _REFERENCE_GROUNDING_PROMPT if reference_mode else _VERIFIED3_DRAFT_PROMPT
+    # The latency-optimized path should prefer the conservative evidence schema.
+    # Dense reference evidence encouraged peripheral details that the simple
+    # caption judge does not reward.
+    grounding_prompt = _VERIFIED3_DRAFT_PROMPT if fast_batch_mode else (
+        _REFERENCE_GROUNDING_PROMPT if reference_mode else _VERIFIED3_DRAFT_PROMPT
+    )
     if ocr_text and reference_mode:
         grounding_prompt += "\n\nLOCAL OCR HINTS (use only when visibly corroborated):\n" + " | ".join(ocr_text[:12])
     try:
@@ -1361,15 +1384,32 @@ def _caption_clip_verified3(
             captions = _parse_fast(
                 _call(
                     caption_config,
-                    _timeline_content(anchors, batch_prompt),
+                    ([{"type": "text", "text": batch_prompt}] if fast_batch_mode else _timeline_content(anchors, batch_prompt)),
                     deadline=deadline,
-                    max_tokens=1100,
+                    max_tokens=750 if fast_batch_mode else 1100,
                     temperature=0.55,
                 )
             )
         except Exception as error:
             _log(f"champion batch writer unavailable; using per-style writers: {error}")
     if set(captions) != set(STYLES):
+        if fast_batch_mode:
+            captions = {
+                style: _deterministic_verified_caption(style, evidence)
+                for style in STYLES
+            }
+            _write_trace(
+                task_id,
+                {
+                    "mode": pipeline,
+                    "draft_model": draft_config.model,
+                    "caption_model": caption_config.model,
+                    "evidence": evidence,
+                    "captions": captions,
+                    "fallback": "deterministic-fast-batch",
+                },
+            )
+            return captions
         captions = {}
         prior: list[str] = []
         for style in STYLES:
@@ -1600,6 +1640,7 @@ def caption_clip_evidence(
         "hybrid-kimi-batch", "kimi-grounded-batch",
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
+        "fast-kimi-gemma", "kimi-gemma-fast",
         "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline, ocr_text=ocr_text)

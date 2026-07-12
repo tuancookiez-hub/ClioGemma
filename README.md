@@ -8,12 +8,13 @@ with formal, sarcastic, humorous-tech, and humorous-non-tech captions.
 
 Track 2 has one submission; Gemma recognition is an award within that track.
 
-`ghcr.io/tuancookiez-hub/cliogemma:score-max-r10-gemma-stable`
+`ghcr.io/tuancookiez-hub/cliogemma:score-max-r14-final`
 
-Digest: `sha256:70a03959943645e979e724a7ebdb6cae5981dfc0c7bb385aa5d3464eb33c08aa`
+Digest: `sha256:a725991b36f7f2b4215e00d76202d6a119db74b40ce4c19346134b13c6548153`
 
-This image uses Kimi K2.6 for dense visual evidence and Gemma 4 for caption
-generation, selection, verification, repair, and emitted captions.
+This image uses four chronological frames, one Kimi K2.6 evidence call, and one
+Gemma 4 batch caption call. Gemma emits every caption. The shorter path avoids
+the fallback-heavy latency failure that produced the 0.10 score.
 
 ## Earlier research candidates
 
@@ -65,12 +66,11 @@ r10 image. The r8/r9 DeepSeek writer branch is retained only as research.
 
 ## Validation
 
-The published r6 and r8 images completed the eight retired AMD validation clips;
-r10 preserves the same contract with the stability profile enabled:
+The final r14 image completed focused judge-style validation:
 
-- 8/8 tasks and 32/32 requested captions
-- r6 completed within the 570-second contract; r8 completed in 272.3 seconds at parallelism three
-- valid schema, non-empty values, and bounded runtime under the 570-second budget
+- 3/3 official clips and 12/12 requested captions in 60.4 seconds
+- separate office/track run: 2/2 clips and 8/8 captions with zero fallbacks
+- valid schema, non-empty values, and bounded two-stage inference
 - anonymous GHCR manifest request: HTTP 200
 - clean `docker pull` and Linux/amd64 manifest inspection: passed
 
@@ -89,14 +89,18 @@ docker buildx build --platform linux/amd64 `
   --build-arg CLIO_VERIFY_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_CAPTION_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_VISION_MODEL=moonshotai/kimi-k2.6 `
-  --build-arg CLIO_PIPELINE=score-max-r1 `
-  --build-arg SWIFTCLIP_FRAME_STRATEGY=scene `
-  --build-arg SWIFTCLIP_FRAME_COUNT=16 `
+  --build-arg CLIO_PIPELINE=fast-kimi-gemma `
+  --build-arg SWIFTCLIP_FRAME_STRATEGY=anchors `
+  --build-arg SWIFTCLIP_FRAME_COUNT=4 `
   --build-arg SWIFTCLIP_FRAME_WIDTH=768 `
   --build-arg CLIO_GRID_INPUT=1 `
   --build-arg CLIO_STABILITY_MODE=1 `
-  --build-arg SWIFTCLIP_PARALLEL=3 `
-  --tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r10-gemma-stable `
+  --build-arg SWIFTCLIP_PARALLEL=2 `
+  --build-arg SWIFTCLIP_CLIP_TIMEOUT=65 `
+  --build-arg SWIFTCLIP_OCR=0 `
+  --build-arg CLIO_REQUEST_TIMEOUT=20 `
+  --build-arg CLIO_RATE_LIMIT_RETRIES=0 `
+  --tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r14-final `
   --push .
 ```
 

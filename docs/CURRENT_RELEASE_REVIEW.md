@@ -12,9 +12,9 @@ There is one Track 2 submission. The following immutable candidate is the
 recommended submission because it combines the source-derived improvements
 with Gemma-owned caption emission:
 
-`ghcr.io/tuancookiez-hub/cliogemma:score-max-r10-gemma-stable`
+`ghcr.io/tuancookiez-hub/cliogemma:score-max-r14-final`
 
-Digest: `sha256:70a03959943645e979e724a7ebdb6cae5981dfc0c7bb385aa5d3464eb33c08aa`
+Digest: `sha256:a725991b36f7f2b4215e00d76202d6a119db74b40ce4c19346134b13c6548153`
 
 Earlier research candidate: `ghcr.io/tuancookiez-hub/cliogemma:score-max-r8-qwen-deepseek`
 
@@ -53,6 +53,7 @@ with 32/32 captions and anonymous GHCR manifest HTTP 200 verification.
 | `score-max-r8-qwen-deepseek` | Qwen3.5 chronological grids, Gemma verification/final grounding, DeepSeek V4 Pro style drafting | Not yet scored |
 | `score-max-r9-stable` | r8 architecture with near-zero evidence/final sampling and bounded creative sampling | Not yet scored |
 | `score-max-r10-gemma-stable` | Kimi chronological grids, Gemma generation/selection/verification/repair, stability profile | Not yet scored |
+| `score-max-r14-final` | Four-frame Kimi evidence, one Gemma batch writer, simple reference-shaped captions, bounded latency | Not yet scored |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.
@@ -164,6 +165,14 @@ Published artifact validation:
 
 ## Score assessment
 
+The r10 submission scored **0.10**. A judge-style diagnostic showed that r10
+took 89.1 seconds for one clip because it chained multiple visual and caption
+calls. A deliberately over-tight 12-second experiment reproduced the actual
+failure mode: provider timeout followed by `The video clip could not be
+captioned.` for every style. r14 replaces that path with one Kimi evidence call
+and one Gemma batch caption call, and its focused three-clip run returned 12/12
+captions with zero fallbacks in 60.4 seconds.
+
 The source-derived r6/r8 candidates address the leader's two largest gaps:
 dense chronological contact sheets and independent style writers. This is
 architectural evidence, not a forecast of the hidden score. The exact AMD
@@ -177,7 +186,7 @@ remains the target; only the hidden AMD judge can establish it.
 
 ## Next experiment policy
 
-1. Submit the immutable `score-max-r10-gemma-stable` tag and record its
+1. Submit the immutable `score-max-r14-final` tag and record its
    official score. This is one Track 2 entry; Gemma recognition is an award
    within the same track, not a second submission.
 2. Do not mutate this tag. Every later experiment gets a new tag.
