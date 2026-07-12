@@ -139,6 +139,32 @@ Return JSON only. Either use four string keys named formal, sarcastic,
 humorous_tech, humorous_non_tech, or use a captions array with objects having
 style and text fields. Do not include reasoning or Markdown."""
 
+_CHAMPION_BATCH_PROMPT = """You are the final Gemma style writer for a strict
+video-captioning benchmark. Use only the verified evidence and chronological
+images below. Return exactly four string keys: formal, sarcastic,
+humorous_tech, humorous_non_tech.
+
+Silently draft two alternatives for each style, remove every unsupported literal
+detail, then return only the strongest survivor. Keep each caption 16-30 words,
+natural, complete, and specific to the visible scene.
+
+formal: objective and professional; describe the persistent subject, setting,
+main action or state, and one or two unmistakable details. Do not mention camera
+movement or peripheral accessories unless central.
+sarcastic: state the literal scene first, then one dry contrast or understated
+payoff. Keep it accurate and unmistakably sarcastic.
+humorous_tech: state the literal scene first, then exactly one clever software
+or technology analogy tied to the visible action. Avoid generic scheduler,
+queue, packet, deployment, or workplace jokes unless the mapping is precise.
+humorous_non_tech: state the literal scene first, then one relatable everyday
+comparison with no technical jargon or invented backstory.
+
+Never leave a quote or sentence unfinished. Do not add names, locations,
+numbers, motives, relationships, audio, or unseen outcomes. Output JSON only.
+
+VERIFIED EVIDENCE:
+{evidence}"""
+
 _VERIFIED_EVIDENCE_PROMPT = """You are the factual evidence stage of a video
 captioning system. Inspect the three chronological labelled images. First check
 the complete sequence internally, then return one conservative JSON object:
@@ -926,20 +952,21 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
     champion_mode = pipeline in {"verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "champion-r2"}
+    batch_mode = pipeline in {"champion-batch", "gemma-champion-batch", "champion-r4"}
     hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8"}
     hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8"}
     balanced_mode = pipeline in {
         "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
         "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi",
         "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion",
-        "champion-r3", "champion-r2", "gemma-champion",
+        "champion-r3", "champion-r2", "gemma-champion", "champion-batch", "gemma-champion-batch", "champion-r4",
     }
     persona_mode = pipeline in {
         "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise",
         "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
         "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8",
         "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion",
-        "champion-r2",
+        "champion-r2", "champion-batch", "gemma-champion-batch", "champion-r4",
         "persona", "persona-grounded",
     }
     eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "champion-r3"}
@@ -976,26 +1003,44 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
             evidence = draft
     caption_config = _caption_model_config(config)
     captions: dict[str, str] = {}
-    prior: list[str] = []
-    for style in STYLES:
+    if batch_mode:
+        batch_prompt = _CHAMPION_BATCH_PROMPT.format(
+            evidence=json.dumps(evidence, ensure_ascii=False, indent=2)
+        )
         try:
-            caption = _write_verified3_style(
-                style,
-                evidence,
-                prior,
-                caption_config,
-                deadline,
-                anchors if persona_mode else None,
-                concise_mode,
-                balanced_mode,
-                champion_mode,
+            captions = _parse_fast(
+                _call(
+                    caption_config,
+                    _timeline_content(anchors, batch_prompt),
+                    deadline=deadline,
+                    max_tokens=1100,
+                    temperature=0.55,
+                )
             )
         except Exception as error:
-            _log(f"verified3 {style} writer unavailable; using evidence-bound local caption: {error}")
-            caption = _deterministic_verified_caption(style, evidence)
-        captions[style] = caption
-        prior.append(caption)
-    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion", "persona", "persona-grounded"}:
+            _log(f"champion batch writer unavailable; using per-style writers: {error}")
+    if set(captions) != set(STYLES):
+        captions = {}
+        prior: list[str] = []
+        for style in STYLES:
+            try:
+                caption = _write_verified3_style(
+                    style,
+                    evidence,
+                    prior,
+                    caption_config,
+                    deadline,
+                    anchors if persona_mode else None,
+                    concise_mode,
+                    balanced_mode,
+                    champion_mode,
+                )
+            except Exception as error:
+                _log(f"verified3 {style} writer unavailable; using evidence-bound local caption: {error}")
+                caption = _deterministic_verified_caption(style, evidence)
+            captions[style] = caption
+            prior.append(caption)
+    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion", "champion-batch", "gemma-champion-batch", "champion-r4", "persona", "persona-grounded"}:
         final_prompt = _VERIFIED4_FINAL_PROMPT.format(
             evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
             captions=json.dumps(captions, ensure_ascii=False, indent=2),
@@ -1183,6 +1228,7 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
         "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi",
         "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8",
         "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion",
+        "champion-batch", "gemma-champion-batch", "champion-r4",
         "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline)
