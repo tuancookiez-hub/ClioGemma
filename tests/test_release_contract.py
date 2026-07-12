@@ -17,6 +17,7 @@ from app.evidence_pipeline import (
     _four_anchor_frames,
     _parse_verified_evidence,
     _normalize,
+    _parse_candidate_sets,
     _retry_delay,
     _retryable_status,
     _three_anchor_frames,
@@ -166,7 +167,7 @@ def test_champion_profile_keeps_anchor_and_normalizes_final_caption(monkeypatch:
                 "humorous_tech": "A train travels beside a platform, like a packet following a stable network route.",
                 "humorous_non_tech": "A train travels beside a platform, like someone taking the long way home on purpose.",
             })
-        if "Return a conservative JSON evidence record" in prompt:
+        if "Inspect the chronological images as one" in prompt:
             return json.dumps(evidence)
         if "Act as a strict second visual observer" in prompt:
             return json.dumps(evidence)
@@ -240,3 +241,61 @@ def test_reference_profile_uses_kimi_grounding_and_skips_global_rewrite(monkeypa
     assert all(model == "google/gemma-4-31b-it" for model, _ in calls[1:])
     assert not any("Perform one final image-grounded revision" in prompt for _, prompt in calls)
     assert "well-routed packet" in result["humorous_tech"]
+
+
+def test_score_max_profile_uses_kimi_candidates_then_gemma_rerank(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import app.evidence_pipeline as pipeline
+
+    frames = []
+    for index in range(6):
+        path = tmp_path / f"score-max-{index}.jpg"
+        path.write_bytes(b"frame")
+        frames.append(Frame(path, index, float(index)))
+
+    evidence = {
+        "scene": "outdoor railway platform",
+        "subjects": ["train", "platform"],
+        "stable_facts": ["a train is visible", "a platform is visible"],
+        "timeline": ["beginning: train beside platform", "end: train remains visible"],
+        "caption_anchor": "A train is beside an outdoor platform",
+        "visible_text": [],
+        "do_not_claim": [],
+    }
+    candidates = {
+        "formal": ["A train stands beside an outdoor platform with the railway visible behind it.", "A railway train remains beside a platform in an outdoor setting."],
+        "sarcastic": ["A train waits beside an outdoor platform, apparently convinced punctuality is optional today.", "A train remains beside the platform, because even railways occasionally embrace a quiet pause."],
+        "humorous_tech": ["A train stays beside the platform like a process holding a stable state in a visible pipeline.", "A train follows the platform like one well-routed packet moving through a physical network."],
+        "humorous_non_tech": ["A train rests beside the platform like someone taking the scenic route home.", "A train remains by the platform with the calm of someone who remembered exactly where they parked."],
+    }
+    calls: list[tuple[str, str]] = []
+
+    def fake_call(config, content, *, deadline, max_tokens, temperature):
+        prompt = " ".join(str(part.get("text", "")) for part in content if part.get("type") == "text")
+        calls.append((config.model, prompt))
+        if "visual caption candidate generator" in prompt:
+            return json.dumps(candidates)
+        if "final Gemma caption editor" in prompt:
+            return json.dumps({style: values[0] for style, values in candidates.items()})
+        if "Inspect the chronological images as one" in prompt or "Analyze the five chronological images as one" in prompt:
+            return json.dumps(evidence)
+        if "Act as a strict second visual observer" in prompt:
+            return json.dumps(evidence)
+        raise AssertionError(f"unexpected score-max provider prompt: {prompt[:100]}")
+
+    monkeypatch.setattr(pipeline, "_call", fake_call)
+    monkeypatch.setenv("CLIO_PIPELINE", "score-max-r1")
+    monkeypatch.setenv("CLIO_VISION_MODEL", "moonshotai/kimi-k2.6")
+    monkeypatch.setenv("CLIO_CAPTION_MODEL", "google/gemma-4-31b-it")
+    monkeypatch.setenv("CLIO_VERIFY_MODEL", "google/gemma-4-31b-it")
+    monkeypatch.setenv("CLIO_ENFORCE_NOVITA", "1")
+    config = ProviderConfig("test", "https://api.novita.ai/openai", "google/gemma-4-31b-it", 25.0)
+
+    parsed = _parse_candidate_sets(json.dumps(candidates))
+    assert set(parsed) == set(STYLES)
+    result = pipeline._caption_clip_verified3(frames, "score-max-test", config, None)
+
+    assert result == {style: values[0] for style, values in candidates.items()}
+    assert calls[0][0] == "moonshotai/kimi-k2.6"
+    assert any("visual caption candidate generator" in prompt and model == "moonshotai/kimi-k2.6" for model, prompt in calls)
+    assert any("final Gemma caption editor" in prompt and model == "google/gemma-4-31b-it" for model, prompt in calls)
+    assert not any("Perform one final image-grounded revision" in prompt for _, prompt in calls)

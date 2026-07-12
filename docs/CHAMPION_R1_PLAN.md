@@ -3,9 +3,9 @@
 **Updated:** 2026-07-12  
 **Track:** AMD Developer Hackathon ACT II, Track 2
 
-> Current release: `gemma4-reference-r3`. This document retains the earlier
-> champion experiments as score history; the five-frame Kimi-evidence/Gemma-
-> writer profile at the end is the active submission candidate.
+> Current release: `score-max-r5`. This document retains earlier champion
+> experiments as score history; the scene-aware Kimi/Gemma ensemble at the end
+> is the active submission candidate.
 
 ## Why the previous candidate failed
 
@@ -17,7 +17,7 @@ The official score sequence is more informative than any single model claim:
 | Gemma 4, four-frame verified path | 0.85 | The strongest confirmed control. |
 | Gemma 4, eight-frame pairs/selector | 0.59 | More frames and a selector can hurt when captions become verbose or generic. |
 | Gemma 4 concise variant | 0.72 | Over-compression removed useful scene detail. |
-| Latest submitted candidate | 0.75 | The Kimi-grounded or balanced experiment did not beat the 0.85 control. |
+| Latest submitted candidate | 0.77 | The reference-calibrated Kimi/Gemma image remained below the 0.85 control. |
 
 The strict self-check proxy also found two concrete failure modes in the current
 outputs: generic `humorous_tech` fallbacks for traffic/cooking and formal captions
@@ -33,8 +33,9 @@ repository keeps Gemma as the load-bearing language model even when Kimi perform
 visual grounding. We apply the safe part of that pattern while preserving our
 proven Gemma-only four-frame control.
 
-The primary R1 profile is therefore Gemma-only. A separate `hybrid-kimi8` alias is
-available for a controlled A/B experiment, but it is not the default submission.
+The score-max profile is now the active submission. The Gemma-only four-frame
+profile remains a control, while `hybrid-kimi8` and earlier aliases are retained
+only for historical A/B comparison.
 
 ## Implemented changes
 
@@ -92,7 +93,7 @@ escaping mistakes:
 
 ## Score expectation
 
-This is a measured recovery candidate, not a guaranteed 0.93. The previous 0.75
+This is a measured recovery candidate, not a guaranteed 0.93. The previous 0.77
 means the hidden judge is stricter than a lenient Gemma proxy. The immediate goal
 is to recover and exceed the confirmed 0.85 control; only an official submission
 can establish whether the additional style selection is enough to approach 0.93.
@@ -108,10 +109,10 @@ The exact published variants completed all eight retired clips with valid output
 | `gemma4-champion-r3` | 8 | 326.7 s | not used as final control | More temporal detail, but transient-action drift appeared. |
 | `gemma4-champion-r6` | 4 | 247.2 s | 0.723 | Gemma batch writer; label leakage fixed. |
 | `gemma4-kimi-batch-r1` | 8 | 269.8 s | **0.759** | Kimi evidence plus Gemma batch writer/final revision; strongest local candidate. |
-| `gemma4-reference-r3` | 5 | **140.4 s** | pairwise: **31/32 wins** over Kimi batch | Dense Kimi facts, dedicated Gemma style writers, reference-calibrated prompts, no flattening global rewrite. |
+| `gemma4-reference-r3` | 5 | **140.4 s** | official **0.77** | Dense Kimi facts, dedicated Gemma style writers, reference-calibrated prompts, no flattening global rewrite. |
+| `score-max-r5` | 6 scene-aware | **351.2 s** | Pending official | OCR hints, Kimi evidence plus two candidates per style, Gemma verification/selection/repair, full eight-clip contract pass. |
 
-The Gemma proxy gave much higher values (0.96+), so the two proxy judges are
-not calibrated to one another. Neither reproduces AMD's hidden evaluator. The
-strongest candidate to test officially is `gemma4-reference-r3`; retain
-`gemma4-champion-r6` as the Gemma-only control. The 31/32 figure is a blind
-pairwise preference result on retired examples, not an AMD score prediction.
+The Gemma proxy gave much higher values (0.96+), so proxy judges are not
+calibrated to AMD's hidden evaluator. The strongest candidate to test officially
+is `score-max-r5`; retain `gemma4-champion-r6` as the Gemma-only control. Local
+retired-set results are regression evidence, not an AMD score prediction.

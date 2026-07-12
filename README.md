@@ -8,12 +8,12 @@ with formal, sarcastic, humorous-tech, and humorous-non-tech captions.
 
 Submit this exact public Linux/amd64 image:
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-reference-r3`
+`ghcr.io/tuancookiez-hub/cliogemma:score-max-r5`
 
-Digest: `sha256:c4d26f321471cff72685c519b952a0854331a9dcd8a608b533b5c84059e6587e`
+Digest: `sha256:b1fe388ebf6ebfd2b0d0326adecf46be82578a47679ba8931ea98894e5c97156`
 
 This is a new, unscored candidate. The latest recorded leaderboard score is
-**0.75**, and the strongest previously confirmed ClioGemma control is **0.85**.
+**0.77**, and the strongest previously confirmed ClioGemma control is **0.85**.
 The new image is not presented as a guaranteed 0.93; only AMD's hidden
 evaluation can establish its official score.
 
@@ -21,32 +21,30 @@ evaluation can establish its official score.
 
 ```text
 video
-  -> five chronological 768px frames
+  -> scene-aware sampling of six chronological 768px frames plus optional OCR hints
   -> Kimi K2.6 dense factual grounding through Novita
      (summary, setting, subjects, primary action, 5-9 stable details,
       timeline, visible text, uncertainty ledger)
-  -> four dedicated Gemma 4 31B multimodal style writers through Novita
-     (one call per requested style, public-guide style calibration,
-      internal two-angle drafting)
+  -> Gemma 4 31B visual verification, then Kimi K2.6 generates two candidates
+     per requested style
+  -> Gemma 4 31B selects and repairs the four final style captions
+     (public-guide style calibration and concrete-detail preservation)
   -> deterministic hallucination, brand, count, cliché, encoding,
      length, style, and schema validation
   -> atomic /output/results.json
 ```
 
-Kimi supplies visual evidence only. Google Gemma 4 writes every caption. The
-reference-calibrated profile deliberately skips the old global rewrite stage,
-which frequently flattened strong jokes into safe generic captions.
+Kimi supplies visual evidence and candidate diversity. Google Gemma 4 owns
+verification, final caption selection, and repairs. The score-max profile keeps
+the richer candidate stage while preserving the exact Track 2 contract.
 
 ## Validation
 
-The exact published r3 image completed the eight retired AMD validation clips:
+The exact published r5 image completed the eight retired AMD validation clips:
 
 - 8/8 tasks and 32/32 requested captions
-- exit code zero in 140.4 seconds at parallelism two
-- valid schema and no deterministic quality-gate failures
-- no empty captions, malformed encoding, or unsupported brand leakage
-- blind comparison against the previous Kimi/Gemma batch candidate: **31 of
-  32 captions preferred**, with one loss on mountain tech humor
+- exit code zero in 351.2 seconds at parallelism two
+- valid schema, non-empty values, and bounded runtime under the 570-second budget
 - anonymous GHCR manifest request: HTTP 200
 - clean `docker pull` and Linux/amd64 manifest inspection: passed
 
@@ -63,11 +61,12 @@ docker buildx build --platform linux/amd64 `
   --build-arg CLIO_VERIFY_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_CAPTION_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_VISION_MODEL=moonshotai/kimi-k2.6 `
-  --build-arg CLIO_PIPELINE=hybrid-kimi-reference `
-  --build-arg SWIFTCLIP_FRAME_COUNT=5 `
+  --build-arg CLIO_PIPELINE=score-max-r1 `
+  --build-arg SWIFTCLIP_FRAME_STRATEGY=scene `
+  --build-arg SWIFTCLIP_FRAME_COUNT=6 `
   --build-arg SWIFTCLIP_FRAME_WIDTH=768 `
   --build-arg SWIFTCLIP_PARALLEL=2 `
-  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-reference-r3 `
+  --tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r5 `
   --push .
 ```
 
@@ -80,7 +79,7 @@ The strictly Gemma-only control remains:
 
 `ghcr.io/tuancookiez-hub/cliogemma:gemma4-champion-r6`
 
-Use r3 when the primary objective is the Track 2 leaderboard. Keep r6 only for
+Use r5 when the primary objective is the Track 2 leaderboard. Keep r6 only for
 a comparison where every model role must be Gemma.
 
 ## Supporting documents

@@ -47,7 +47,7 @@ def probe_duration(video: Path, timeout_s: float = 20.0) -> float:
 
 def mine_frames(video: Path, out_dir: Path, *, count: int = 5, width: int = 896, deadline: float | None = None, strategy: str = "anchors") -> list[Frame]:
     strategy = strategy.lower().strip()
-    if strategy not in {"anchors", "seek", "uniform"}:
+    if strategy not in {"anchors", "seek", "uniform", "scene"}:
         raise ValueError(f"unknown frame strategy: {strategy}")
     count = max(1, min(count, 16))
     width = max(160, width)
@@ -57,10 +57,11 @@ def mine_frames(video: Path, out_dir: Path, *, count: int = 5, width: int = 896,
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob("*.jpg"):
         old.unlink()
+    sample_count = max(count * 2, 10) if strategy == "scene" and count > 1 else count
     if count == 1:
         positions = [duration * 0.5]
-    elif strategy == "anchors":
-        positions = [duration * (0.05 + 0.90 * index / (count - 1)) for index in range(count)]
+    elif strategy in {"anchors", "scene"}:
+        positions = [duration * (0.05 + 0.90 * index / (sample_count - 1)) for index in range(sample_count)]
     else:
         positions = [min(duration * index / (count - 1), duration * 0.999) for index in range(count)]
     paths: list[tuple[Path, float]] = []
@@ -81,7 +82,22 @@ def mine_frames(video: Path, out_dir: Path, *, count: int = 5, width: int = 896,
         brightness, sharpness, motion = _metrics(pixels, previous)
         previous = pixels
         frames.append(Frame(path, index, timestamp, brightness, sharpness, motion))
-    return frames[:count]
+    if strategy != "scene" or len(frames) <= count:
+        return frames[:count]
+
+    # Keep the beginning, middle, and end, then add the sharpest temporal
+    # changes from the remaining sequence. This combines stable coverage with
+    # scene-change evidence without allowing one transient frame to dominate.
+    last = len(frames) - 1
+    selected: set[int] = {0, last, round(last / 2)}
+    while len(selected) < count:
+        remaining = [index for index in range(len(frames)) if index not in selected]
+        if not remaining:
+            break
+        chosen = max(remaining, key=lambda index: (frames[index].motion, frames[index].sharpness))
+        selected.add(chosen)
+    ordered = [frames[index] for index in sorted(selected)]
+    return [Frame(frame.path, index, frame.t_sec, frame.brightness, frame.sharpness, frame.motion) for index, frame in enumerate(ordered[:count])]
 
 
 def clean_frames(path: Path) -> None:

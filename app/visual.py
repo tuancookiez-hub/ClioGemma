@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from app.core.frames import mine_frames
+from app.core.ocr import extract_visible_text
 from app.core.parse import STYLES
 
 FALLBACK = "The video clip could not be captioned."
@@ -53,8 +54,9 @@ def run_task_combined(video_url: str, task_id: str, styles: list[str], out_dir: 
     frames = mine_frames(video, work / "frames", count=count, width=width, strategy=strategy, deadline=deadline)
     if not frames:
         raise RuntimeError("frame extraction failed")
+    ocr_text = extract_visible_text(frames) if os.environ.get("SWIFTCLIP_OCR", "1").lower() not in {"0", "false", "no"} else []
     timeout = None if deadline is None else max(1.0, deadline - time.monotonic())
-    captions = caption_clip_evidence(frames, task_id, timeout_s=timeout)
+    captions = caption_clip_evidence(frames, task_id, timeout_s=timeout, ocr_text=ocr_text)
     return {style: captions.get(style, "") for style in styles}
 
 

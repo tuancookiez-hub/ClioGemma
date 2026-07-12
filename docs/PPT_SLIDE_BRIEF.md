@@ -6,8 +6,8 @@ leaderboard-results report.
 
 ## Core message
 
-**ClioGemma separates seeing from writing: Gemma verifies what happened first,
-then expresses the same evidence in four distinct voices.**
+**ClioGemma separates seeing from writing: Kimi builds visual candidates, while
+Gemma verifies and expresses the same evidence in four distinct voices.**
 
 ## Slide plan
 
@@ -34,10 +34,10 @@ directions.
 ### 3. Product flow
 
 1. Receive a video task.
-2. Sample four chronological moments.
-3. Build and verify a factual record.
-4. Write one grounded caption for each requested style with evaluator-aligned style guidance.
-5. Run a final Gemma grounding revision against the evidence.
+2. Sample six scene-aware chronological moments and optional OCR hints.
+3. Build a factual record and verify it with Gemma.
+4. Generate two Kimi candidates for each requested style.
+5. Let Gemma select or repair the final four captions.
 6. Return evaluator-ready JSON.
 
 ### 4. Architecture
@@ -45,16 +45,16 @@ directions.
 ```mermaid
 flowchart LR
     A["/input/tasks.json"] --> B["Download + FFmpeg"]
-    B --> C["4 chronological anchors"]
-    C --> D["Gemma 4 evidence record"]
-    D --> E["Gemma 4 visual verification"]
-    E --> F["4 grounded persona writers"]
-    F --> G["Final Gemma grounding revision"]
+    B --> C["6 scene-aware frames + OCR"]
+    C --> D["Kimi K2.6 evidence"]
+    D --> E["Gemma 4 verification"]
+    E --> F["Kimi two candidates/style"]
+    F --> G["Gemma select + repair"]
     G --> H["Schema validation"]
     H --> I["/output/results.json"]
 ```
 
-Callouts: Novita-only, Gemma-only, no separate judge, Linux/amd64, bounded
+Callouts: Novita-only, Gemma-owned final captions, no separate judge, Linux/amd64, bounded
 runtime.
 
 ### 5. Grounding design
@@ -108,8 +108,8 @@ Include the GitHub repository, demo URL, and public image reference.
 
 - Do not claim a score above 0.92 unless the exact image digest receives it.
 - Do not describe the older 0.85 image as the current architecture.
-- Do not claim Claude, Kimi, Gemini, Fireworks, Whisper, or an external judge
-  is used in production.
+- Do not claim Claude, Gemini, Fireworks, Whisper, or an external judge is used
+  in production.
 - Do not expose credentials.
 
 ## Source files

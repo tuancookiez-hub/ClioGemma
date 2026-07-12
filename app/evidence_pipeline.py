@@ -1,4 +1,4 @@
-"""Novita + Gemma-only evidence-first caption generation."""
+"""Novita evidence-first caption generation with Gemma-owned final captions."""
 from __future__ import annotations
 
 import base64
@@ -320,6 +320,72 @@ attitude clearly presented as humor. No technical jargon. Style pattern only:
 Never copy the example's facts.""",
 }
 
+_KIMI_CANDIDATE_PROMPT = """You are the visual caption candidate generator in a
+high-accuracy video-captioning system. Inspect the ordered images and the
+verified evidence. Return exactly two distinct candidates for each requested
+style in this JSON shape:
+{{"formal":["...","..."],"sarcastic":["...","..."],"humorous_tech":["...","..."],"humorous_non_tech":["...","..."]}}
+
+Each candidate must be 16-32 words, start from the central visible subject or
+state, and include at least two concrete scene details. Formal is documentary
+and literal. Sarcasm is unmistakably dry with one scene-specific contrast.
+Humorous-tech uses one precise technical metaphor tied to the visible action.
+Humorous-non-tech uses one warm everyday comparison with no technical jargon.
+An obviously figurative punchline may invent an attitude or imagined situation,
+but never present a new object, identity, location, count, or event as literal.
+Do not name a city, landmark, or building unless clearly readable and central.
+Do not describe camera movement, frames, models, prompts, or analysis. Avoid generic
+load-balancer, Monday, oven, workplace, or empty-stadium jokes unless the
+visible scene makes that comparison genuinely specific. Output JSON only.
+
+VERIFIED EVIDENCE:
+{evidence}"""
+
+_GEMMA_CANDIDATE_PICK_PROMPT = """You are the final Gemma caption editor. For
+each style, choose or minimally repair the strongest candidate below using the
+ordered images and VERIFIED EVIDENCE. Gemma must emit the final captions.
+
+Accuracy is a hard gate for literal scene facts. Preserve useful concrete
+details instead of genericizing them. Sarcasm must be dry and clearly funny.
+Humorous-tech must contain exactly one coherent technical mapping to a visible
+relationship, using at most two related technical terms. Humorous-non-tech must contain one relatable everyday payoff and
+no technical jargon. Remove unsupported literal claims, especially names,
+brands, exact or approximate counts, locations, camera/process language, and
+inferred outcomes, but keep an obviously figurative joke when its factual setup
+is true. Prefer 14-26 words for creative styles and 16-30 for formal. Use one
+central subject, one setting/action detail, and one style beat; end every
+sentence cleanly.
+
+Return JSON only with exactly four string keys: formal, sarcastic,
+humorous_tech, humorous_non_tech.
+
+VERIFIED EVIDENCE:
+{evidence}
+
+CANDIDATES:
+{candidates}"""
+
+_GEMMA_REPAIR_PROMPT = """You are the last quality gate for four video captions.
+Use the ordered images and VERIFIED EVIDENCE as the only factual sources.
+Rewrite only captions with listed issues, while preserving concrete visible
+details and the requested style. Remove unsupported names, brands, exact or
+approximate counts, inferred outcomes, camera/process language, and generic
+stock jokes. Do not name a city, landmark, or building unless clearly readable
+and central. Avoid camera movement, frames, and inferred completion. A
+figurative joke is allowed only after a true visible setup.
+Return JSON only with exactly four string keys: formal, sarcastic,
+humorous_tech, humorous_non_tech. Keep formal 16-32 words and each creative
+style 14-26 words. Every sentence must be complete.
+
+VERIFIED EVIDENCE:
+{evidence}
+
+CURRENT CAPTIONS:
+{captions}
+
+DETERMINISTIC ISSUES:
+{issues}"""
+
 _VERIFIED4_FINAL_PROMPT = """Perform one final image-grounded revision of the
 four proposed captions. The chronological images and verified evidence are the
 only factual sources. Preserve each requested tone, but remove or correct any
@@ -383,9 +449,10 @@ _TECH = {
     "code", "commit", "compile", "cpu", "database", "debug", "deploy",
     "deployment", "download", "endpoint", "gpu", "hotfix", "input", "interface",
     "app", "json", "kernel", "latency", "layer", "log", "memory", "middleware", "network", "packet",
-    "pipeline", "process", "program", "queue", "regex", "render", "repo",
-    "rollback", "runtime", "scheduler", "script", "server", "software", "stack",
-    "state", "thread", "ui", "upload", "wifi", "zoom",
+    "pipeline", "process", "program", "protocol", "queue", "regex", "render", "repo",
+    "rollback", "router", "runtime", "scheduler", "script", "server", "software", "shader", "signal", "stack",
+    "state", "thread", "throughput", "ui", "upload", "vertices", "wifi", "zoom", "mutex", "handshake",
+    "buffer", "cache", "firmware", "boot", "simulation", "deployment", "update", "deadlock", "keystroke", "keystrokes",
 }
 _SPECULATIVE = re.compile(
     r"\b(probably|likely|decid(?:e|es|ed|ing)|wants?|wanted|remembers?|pretends?|"
@@ -393,7 +460,7 @@ _SPECULATIVE = re.compile(
     re.I,
 )
 _PROCESS = re.compile(
-    r"\b(frames?|sampling|model|prompt|analysis|detection|uncertain(?:ty)?|"
+    r"\b(camera|sampling|model|prompt|analysis|detection|uncertain(?:ty)?|"
     r"image quality|jpe?g|pixels?|camera footage|computer vision)\b",
     re.I,
 )
@@ -403,12 +470,12 @@ _RELATIONSHIP = re.compile(
     re.I,
 )
 _BRAND = re.compile(
-    r"\b(?:adidas|apple|coca[- ]?cola|facebook|google|imac|instagram|macbook|nike|starbucks|tesla|tiktok|youtube)\b",
+    r"\b(?:adidas|apple|coca[- ]?cola|facebook|google|imac|instagram|joysound|macbook|nike|starbucks|tesla|tiktok|youtube)\b",
     re.I,
 )
 _AWKWARD_TECH = re.compile(r"\b(running runtime|physical cache|sign (?:as|is) an api|scheduler scheduling)\b", re.I)
 _DURATION = re.compile(r"\b\d+(?:\.\d+)?\s+(?:seconds?|minutes?|hours?)\b", re.I)
-_UNSTABLE_COUNT = re.compile(r"\b(?:hundreds|thousands|millions)\b", re.I)
+_UNSTABLE_COUNT = re.compile(r"\b(?:hundreds?|thousands?|millions?)\b", re.I)
 
 
 def _remaining(deadline: float | None) -> float | None:
@@ -641,15 +708,26 @@ def _select(style: str, candidates: tuple[str, str], frames: list[Frame], eviden
     return candidates[choice]
 
 
-def _parse_fast(raw: str) -> dict[str, str]:
-    text = raw.strip()
+def _decode_json_object(raw: str, label: str) -> dict:
+    text = (raw or "").strip()
     fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.I | re.S)
     if fenced:
         text = fenced.group(1).strip()
-    match = re.search(r"\{.*\}", text, re.S)
-    if not match:
-        raise EvidencePipelineError("fast Gemma call returned no JSON")
-    data = json.loads(match.group(0))
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    raise EvidencePipelineError(f"{label} returned no JSON object")
+
+
+def _parse_fast(raw: str) -> dict[str, str]:
+    data = _decode_json_object(raw, "fast Gemma call")
     if isinstance(data, dict) and isinstance(data.get("captions"), list):
         out = {}
         for item in data["captions"]:
@@ -664,17 +742,89 @@ def _parse_fast(raw: str) -> dict[str, str]:
     raise EvidencePipelineError("fast Gemma call returned the wrong caption schema")
 
 
+def _parse_candidate_sets(raw: str) -> dict[str, list[str]]:
+    data = _decode_json_object(raw, "candidate call")
+    result: dict[str, list[str]] = {}
+    for style in STYLES:
+        value = data.get(style)
+        if isinstance(value, str):
+            values = [_normalize(value)]
+        elif isinstance(value, list):
+            values = [_normalize(str(item)) for item in value if str(item).strip()]
+        else:
+            values = []
+        values = [item for item in values if item]
+        if len(values) < 2:
+            raise EvidencePipelineError(f"candidate output lacks two {style} candidates")
+        result[style] = values[:2]
+    return result
+
+
+def _kimi_style_candidates(
+    frames: list[Frame],
+    evidence: dict,
+    config: ProviderConfig,
+    deadline: float | None,
+) -> dict[str, list[str]]:
+    prompt = _KIMI_CANDIDATE_PROMPT.format(
+        evidence=json.dumps(evidence, ensure_ascii=False, indent=2)
+    )
+    raw = _call(
+        config,
+        _timeline_content(frames, prompt),
+        deadline=deadline,
+        max_tokens=1600,
+        temperature=0.7,
+    )
+    return _parse_candidate_sets(raw)
+
+
+def _gemma_select_candidates(
+    frames: list[Frame],
+    evidence: dict,
+    candidates: dict[str, list[str]],
+    config: ProviderConfig,
+    deadline: float | None,
+) -> dict[str, str]:
+    prompt = _GEMMA_CANDIDATE_PICK_PROMPT.format(
+        evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
+        candidates=json.dumps(candidates, ensure_ascii=False, indent=2),
+    )
+    raw = _call(
+        config,
+        _timeline_content(frames, prompt),
+        deadline=deadline,
+        max_tokens=1100,
+        temperature=0.15,
+    )
+    return _parse_fast(raw)
+
+
+def _gemma_repair_captions(
+    frames: list[Frame],
+    evidence: dict,
+    captions: dict[str, str],
+    issues: dict[str, list[str]],
+    config: ProviderConfig,
+    deadline: float | None,
+) -> dict[str, str]:
+    prompt = _GEMMA_REPAIR_PROMPT.format(
+        evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
+        captions=json.dumps(captions, ensure_ascii=False, indent=2),
+        issues=json.dumps(issues, ensure_ascii=False, indent=2),
+    )
+    raw = _call(
+        config,
+        _timeline_content(frames, prompt),
+        deadline=deadline,
+        max_tokens=1100,
+        temperature=0.1,
+    )
+    return _parse_fast(raw)
+
+
 def _parse_verified_evidence(raw: str) -> dict:
-    text = raw.strip()
-    fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.I | re.S)
-    if fenced:
-        text = fenced.group(1).strip()
-    match = re.search(r"\{.*\}", text, re.S)
-    if not match:
-        raise EvidencePipelineError("verified evidence call returned no JSON")
-    data = json.loads(match.group(0))
-    if not isinstance(data, dict):
-        raise EvidencePipelineError("verified evidence was not an object")
+    data = _decode_json_object(raw, "verified evidence call")
     stable = data.get("stable_facts")
     timeline = data.get("timeline")
     if not isinstance(stable, list) or not stable:
@@ -1042,21 +1192,30 @@ def _deterministic_verified_caption(style: str, evidence: dict) -> str:
     return f"{anchor}, {ending}"
 
 
-def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
+def _caption_clip_verified3(
+    frames: list[Frame],
+    task_id: str,
+    config: ProviderConfig,
+    deadline: float | None,
+    ocr_text: list[str] | None = None,
+) -> dict[str, str]:
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
-    reference_mode = pipeline in {"hybrid-kimi-reference", "reference-r1", "score-r1"}
+    score_max_mode = pipeline in {"score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
+    reference_mode = pipeline in {"hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
+    gemma_reference_mode = pipeline in {"gemma-reference", "reference-gemma-r1"}
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
     champion_mode = pipeline in {"verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "champion-r2"}
     batch_mode = pipeline in {"champion-batch", "gemma-champion-batch", "champion-r4", "hybrid-kimi-batch", "kimi-grounded-batch"}
-    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "hybrid-kimi-reference", "reference-r1", "score-r1"}
-    hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch"}
+    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "hybrid-kimi-reference", "reference-r1", "score-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
+    hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
     balanced_mode = pipeline in {
         "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
         "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi",
         "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion",
         "champion-r3", "champion-r2", "gemma-champion", "champion-batch", "gemma-champion-batch", "champion-r4",
         "hybrid-kimi-batch", "kimi-grounded-batch",
-        "hybrid-kimi-reference", "reference-r1", "score-r1",
+        "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
+        "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
     }
     persona_mode = pipeline in {
         "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise",
@@ -1065,15 +1224,18 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
         "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion",
         "champion-r2", "champion-batch", "gemma-champion-batch", "champion-r4",
         "hybrid-kimi-batch", "kimi-grounded-batch",
-        "hybrid-kimi-reference", "reference-r1", "score-r1",
+        "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
+        "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
         "persona", "persona-grounded",
     }
     eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "champion-r3", "hybrid-kimi-batch", "kimi-grounded-batch"}
-    anchors = _five_anchor_frames(frames) if reference_mode else (
+    anchors = frames if score_max_mode else (_five_anchor_frames(frames) if reference_mode and not gemma_reference_mode else (
         _eight_anchor_frames(frames) if eight_frame_mode else (_four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames))
-    )
+    ))
     draft_config = _vision_model_config(config) if hybrid_mode else config
     grounding_prompt = _REFERENCE_GROUNDING_PROMPT if reference_mode else _VERIFIED3_DRAFT_PROMPT
+    if ocr_text and reference_mode:
+        grounding_prompt += "\n\nLOCAL OCR HINTS (use only when visibly corroborated):\n" + " | ".join(ocr_text[:12])
     try:
         draft_raw = _call(
             draft_config,
@@ -1096,7 +1258,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                 verify_config,
                 _timeline_content(anchors, review_prompt),
                 deadline=deadline,
-                max_tokens=650,
+                max_tokens=900,
                 temperature=0.05,
             )
             evidence = _parse_verified_evidence(verified_raw)
@@ -1105,6 +1267,14 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
             evidence = draft
     caption_config = _caption_model_config(config)
     captions: dict[str, str] = {}
+    candidate_sets: dict[str, list[str]] | None = None
+    if score_max_mode:
+        try:
+            candidate_sets = _kimi_style_candidates(anchors, evidence, draft_config, deadline)
+            captions = _gemma_select_candidates(anchors, evidence, candidate_sets, caption_config, deadline)
+        except Exception as error:
+            _log(f"score-max candidate/rerank stage unavailable; using Gemma writers: {error}")
+            captions = {}
     if batch_mode:
         batch_prompt = _CHAMPION_BATCH_PROMPT.format(
             evidence=json.dumps(evidence, ensure_ascii=False, indent=2)
@@ -1143,6 +1313,16 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                 caption = _deterministic_verified_caption(style, evidence)
             captions[style] = caption
             prior.append(caption)
+    if score_max_mode and set(captions) == set(STYLES):
+        issues = _caption_batch_issues(captions, str(evidence.get("caption_anchor", "")))
+        if issues:
+            try:
+                repaired = _gemma_repair_captions(anchors, evidence, captions, issues, caption_config, deadline)
+                repaired_issues = _caption_batch_issues(repaired, str(evidence.get("caption_anchor", "")))
+                if _issue_count(repaired_issues) <= _issue_count(issues):
+                    captions = repaired
+            except Exception as repair_error:
+                _log(f"score-max deterministic repair unavailable; retaining selected captions: {repair_error}")
     if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion", "champion-batch", "gemma-champion-batch", "champion-r4", "persona", "persona-grounded"}:
         final_prompt = _VERIFIED4_FINAL_PROMPT.format(
             evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
@@ -1205,6 +1385,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
             "draft_model": draft_config.model,
             "verification_model": verify_config.model,
             "caption_model": caption_config.model,
+            "candidate_sets": candidate_sets,
             "draft": draft,
             "evidence": evidence,
             "captions": captions,
@@ -1307,7 +1488,13 @@ def _caption_clip_verified7(frames: list[Frame], task_id: str, config: ProviderC
     return captions
 
 
-def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str] = None, timeout_s: Optional[float] = None) -> dict[str, str]:
+def caption_clip_evidence(
+    frames: list[Frame],
+    task_id: str,
+    model: Optional[str] = None,
+    timeout_s: Optional[float] = None,
+    ocr_text: list[str] | None = None,
+) -> dict[str, str]:
     if not frames:
         raise EvidencePipelineError(f"no frames available for {task_id}")
     deadline = None if timeout_s is None else time.monotonic() + timeout_s
@@ -1333,10 +1520,11 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
         "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion",
         "champion-batch", "gemma-champion-batch", "champion-r4",
         "hybrid-kimi-batch", "kimi-grounded-batch",
-        "hybrid-kimi-reference", "reference-r1", "score-r1",
+        "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
+        "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
         "persona", "persona-grounded",
     }:
-        return _caption_clip_verified3(frames, task_id, config, deadline)
+        return _caption_clip_verified3(frames, task_id, config, deadline, ocr_text=ocr_text)
     if pipeline in {"verified2", "verified-2", "two-stage"}:
         return _caption_clip_verified2(frames, task_id, config, deadline)
     if os.environ.get("CLIO_FAST_MODE", "").lower() in {"1", "true", "yes"}:

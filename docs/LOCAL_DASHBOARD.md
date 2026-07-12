@@ -19,8 +19,8 @@ Open <http://127.0.0.1:8787>.
 
 Without an API key, the UI still loads for visual review, but generation
 returns a clear configuration message. With a key, the dashboard uses the same
-five-anchor, one-call Gemma path as the current release. It does not add a
-judge, Claude, Gemini, audio provider, or second caption model.
+score-max Docker path is the current release. It does not add a judge, Claude,
+Gemini, audio provider, or external scoring model.
 
 ## Stop it
 
