@@ -33,6 +33,7 @@ score above 0.92.
 | `gemma4-8f-pairs-picker-p2-r1` | Eight-frame evidence, two candidates per style, visual selection | **0.59** |
 | `gemma4-4f-verified5-concise-p2-r1` | Four-frame verified5 path, concise style calibration, final revision | **0.72** |
 | `gemma4-4f-verified5-balanced-p2-r2` | Four-frame verified5 path, restored detail/temperature, style quality guard | Pending |
+| `gemma4-4f-kimi-grounded-p2-r3` | Kimi K2.6 evidence, Gemma writers/final revision | Pending |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.
@@ -82,6 +83,10 @@ that missed the hidden judge's preference for short, directly visible captions.
 Every model role is `google/gemma-4-31b-it` through Novita. There is no Claude,
 Kimi, Gemini, audio model, external scoring judge, hardcoded evaluator answer,
 or provider fallback in the image.
+
+The separate hybrid diagnostic changes only the first evidence role to
+`moonshotai/kimi-k2.6`; all caption writers and the final revision remain
+Gemma 4. See [MODEL_AB_COMPARISON.md](MODEL_AB_COMPARISON.md).
 
 ## Improvements beyond the 0.85 image
 

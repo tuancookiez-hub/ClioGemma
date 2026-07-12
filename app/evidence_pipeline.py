@@ -845,11 +845,18 @@ def _deterministic_verified_caption(style: str, evidence: dict) -> str:
     anchor = _normalize_anchor(str(evidence.get("caption_anchor", "")))
     if not anchor:
         anchor = _normalize(str(evidence.get("scene", "The main subject remains visible"))).rstrip(".?!")
+    if style == "formal":
+        stable_facts = evidence.get("stable_facts")
+        if isinstance(stable_facts, list):
+            for fact in stable_facts:
+                detail = _normalize(str(fact)).rstrip(".?!")
+                if detail and detail.casefold() not in anchor.casefold():
+                    return f"{anchor.rstrip('.?!')}. {detail}."
+        return f"{anchor.rstrip('.?!')}."
     endings = {
-        "formal": "in the visible setting, with the surrounding details remaining clearly observable.",
-        "sarcastic": "and apparently this perfectly ordinary scene has appointed itself the most important event of the day.",
-        "humorous_tech": "like a legacy process nobody wants to debug but everyone is afraid to stop.",
-        "humorous_non_tech": "with the unmistakable energy of a weekday task everyone hoped somebody else would handle.",
+        "sarcastic": "and apparently this ordinary scene has decided to demand our full attention.",
+        "humorous_tech": "like a software task waiting on one visible input.",
+        "humorous_non_tech": "with an unexpectedly dramatic sense of purpose.",
     }
     return f"{anchor}, {endings[style]}"
 
@@ -924,7 +931,8 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
             final_prompt += (
                 "\nFor this balanced profile, retain useful concrete detail and natural sentence length. "
                 "Remove unsupported numbers, durations, names, locations, props, or literal unseen outcomes even when they appear inside a joke. "
-                "Keep each creative punchline tied to the specific visible action or transformation."
+                "Keep each creative punchline tied to the specific visible action or transformation. "
+                "Reject generic legacy-process, weekday-task, empty-bleachers, or other stock formulas; rewrite the joke around the clip-specific detail."
             )
         try:
             reviewed_raw = _call(

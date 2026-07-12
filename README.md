@@ -79,6 +79,19 @@ Digest: `sha256:9dcc777f1e80256fecee64fbfa3f105f549e5b0e38c3f9100098ec21fefe824f
 See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
 score diagnosis, competitor evidence, provenance caveats, and experiment plan.
 
+## Hybrid diagnostic candidate
+
+The Track 2 guide permits any model, so a separately published diagnostic uses
+Kimi K2.6 only for visual evidence and keeps Gemma 4 for every caption writer
+and final revision:
+
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-kimi-grounded-p2-r3`
+
+Digest: `sha256:dbae1f1d3420c7394704a3ca4bee466951ef214818c42bd6eae86e0c2533b201`
+
+See [docs/MODEL_AB_COMPARISON.md](docs/MODEL_AB_COMPARISON.md) before choosing
+between the Gemma-only control and this hybrid experiment.
+
 ## Streamlit demo
 
 The human-facing demo is `streamlit_app.py`. It is separate from the evaluator

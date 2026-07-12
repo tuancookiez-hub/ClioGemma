@@ -60,6 +60,18 @@ Verified public digest:
 
 > ClioGemma's submission image is a public `linux/amd64` container that follows the Track 2 contract: it reads `/input/tasks.json`, returns every requested caption style, writes valid `/output/results.json`, and exits cleanly. The production path uses four chronological FFmpeg anchors and Novita-hosted Google Gemma 4 for factual observation, independent visual verification, one grounded persona-specific writer per style, and a final grounding revision. It uses no external judge, non-Gemma caption writer, audio model, or hardcoded evaluator answer. The exact balanced source completed all eight retired validation videos with 32/32 captions, and the pulled public artifact passed a separate mounted input/output run with 2/2 tasks and 8/8 captions. The public Streamlit application is a human-facing demo; the AMD evaluator runs the Docker entrypoint. The restricted, revocable Track 2 credential is not stored in GitHub.
 
+### Optional hybrid experiment
+
+For the general Track 2 experiment, an alternative public image uses Kimi K2.6
+for visual evidence and Gemma 4 for every caption writer and final revision:
+
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-4f-kimi-grounded-p2-r3`
+
+Digest: `sha256:dbae1f1d3420c7394704a3ca4bee466951ef214818c42bd6eae86e0c2533b201`
+
+Use this only after recording the Gemma-only control score; it has passed local
+eight-clip validation but has no official AMD score yet.
+
 ## Final checklist
 
 - [x] Push the exact public Linux/amd64 image tag above.
