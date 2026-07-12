@@ -18,12 +18,18 @@ Source-derived broad Track 2 candidate:
 
 Digest: `sha256:e10362b03f5527a6a32e31119331f2a3ecee78bf60cbc8c04cb7e04775b19418`
 
+Variance-controlled broad candidate:
+
+`ghcr.io/tuancookiez-hub/cliogemma:score-max-r9-stable`
+
+Digest: `sha256:9d2cd8fa19a82dc5e5caecb4eb71c88863665a125e273433003608317b296152`
+
 This is a new, unscored candidate. The latest recorded leaderboard score is
 **0.77**, and the strongest previously confirmed ClioGemma control is **0.85**.
 Neither image is presented as a guaranteed 0.93; only AMD's hidden evaluation
 can establish the official score. Use r6 when Gemma-track eligibility is the
-priority; use r8 when the broad Track 2 score is the priority and supporting
-non-Gemma writers are permitted.
+priority; use r8 for the high-variance broad route or r9 for the same route
+with output-variance control when supporting non-Gemma writers are permitted.
 
 ## Architecture
 

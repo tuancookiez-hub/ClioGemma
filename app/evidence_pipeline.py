@@ -506,6 +506,20 @@ def _retry_delay(attempt: int) -> float:
     return min(1.5 * (2 ** attempt), 6.0)
 
 
+def _effective_temperature(value: float) -> float:
+    """Reduce provider sampling variance for an immutable release profile.
+
+    Candidate generation remains mildly creative, while evidence, selection,
+    repair, and final grounding become deterministic whenever
+    ``CLIO_STABILITY_MODE`` is enabled. This cannot control a hidden judge, but
+    it prevents our own output from changing unnecessarily between runs.
+    """
+    stable = os.environ.get("CLIO_STABILITY_MODE", "").lower() in {"1", "true", "yes"}
+    if not stable:
+        return value
+    return 0.45 if value >= 0.55 else 0.0
+
+
 def _call(config: ProviderConfig, content: list[dict], *, deadline: float | None, max_tokens: int, temperature: float) -> str:
     try:
         retries = max(0, min(int(os.environ.get("CLIO_RATE_LIMIT_RETRIES", "3")), 4))
@@ -541,14 +555,16 @@ def _call(config: ProviderConfig, content: list[dict], *, deadline: float | None
                 # internal reasoning keeps the response budget available for
                 # the requested evidence schema.
                 request_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+                if os.environ.get("CLIO_STABILITY_MODE", "").lower() in {"1", "true", "yes"}:
+                    request_kwargs["temperature"] = 0.0
             elif "deepseek" in model_name:
                 # Novita's DeepSeek V4 endpoint exposes the same thinking
                 # control.  Without this, the reasoning transcript is placed
                 # in message.content and JSON caption parsing fails.
                 request_kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
-                request_kwargs["temperature"] = temperature
+                request_kwargs["temperature"] = _effective_temperature(temperature)
             else:
-                request_kwargs["temperature"] = temperature
+                request_kwargs["temperature"] = _effective_temperature(temperature)
             response = client.chat.completions.create(**request_kwargs)
             break
         except Exception as error:

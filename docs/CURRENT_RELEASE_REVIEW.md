@@ -18,6 +18,10 @@ Source-derived broad Track 2 candidate: `ghcr.io/tuancookiez-hub/cliogemma:score
 
 Digest: `sha256:e10362b03f5527a6a32e31119331f2a3ecee78bf60cbc8c04cb7e04775b19418`
 
+Variance-controlled broad candidate: `ghcr.io/tuancookiez-hub/cliogemma:score-max-r9-stable`
+
+Digest: `sha256:9d2cd8fa19a82dc5e5caecb4eb71c88863665a125e273433003608317b296152`
+
 The latest confirmed ClioGemma score is **0.77**. The strongest confirmed
 control is **0.85**, earned by the older four-frame `verified5` architecture.
 The eight-frame pairs/selector experiment scored **0.59** and the concise
@@ -45,6 +49,7 @@ with 32/32 captions and anonymous GHCR manifest HTTP 200 verification.
 | `score-max-r5` | Scene-aware six frames, OCR hints, Kimi evidence plus two candidates per style, Gemma verification/selection/repair | Pending |
 | `score-max-r6-grid` | Up-to-16-frame chronological 4x4 grids, Kimi evidence, Gemma verification/selection/repair | Not yet scored |
 | `score-max-r8-qwen-deepseek` | Qwen3.5 chronological grids, Gemma verification/final grounding, DeepSeek V4 Pro style drafting | Not yet scored |
+| `score-max-r9-stable` | r8 architecture with near-zero evidence/final sampling and bounded creative sampling | Not yet scored |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.
@@ -169,8 +174,9 @@ remains the target; only the hidden AMD judge can establish it.
 
 ## Next experiment policy
 
-1. Pick one immutable tag: r6 for Gemma-track eligibility, or r8 for the
-   source-derived broad Track 2 route, and record its digest and official score.
+1. Pick one immutable tag: r6 for Gemma-track eligibility, r8 for the
+   source-derived broad route, or r9 for that route with output-variance
+   control. Record its digest and official score.
 2. Do not mutate this tag. Every later experiment gets a new tag.
 3. If the score is below 0.90, inspect whether the failure is accuracy, style,
    or incomplete outputs before changing architecture. Do not resubmit the same
