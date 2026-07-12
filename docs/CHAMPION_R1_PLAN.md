@@ -69,6 +69,13 @@ docker buildx build --platform linux/amd64 `
 For the optional A/B image, change only the pipeline to `hybrid-kimi8`, frame
 count to `8`, and use `CLIO_VISION_MODEL=moonshotai/kimi-k2.6`.
 
+The checked-in PowerShell wrapper performs the same build without multiline
+escaping mistakes:
+
+```powershell
+.\scripts\build_champion.ps1 -Push
+```
+
 ## Verification status
 
 - Repository tests: 6 passed.
@@ -85,4 +92,3 @@ This is a measured recovery candidate, not a guaranteed 0.93. The previous 0.75
 means the hidden judge is stricter than a lenient Gemma proxy. The immediate goal
 is to recover and exceed the confirmed 0.85 control; only an official submission
 can establish whether the additional style selection is enough to approach 0.93.
-
