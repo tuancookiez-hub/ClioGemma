@@ -190,7 +190,7 @@ keys:
   "stable_facts": ["concrete facts directly supported by the images"],
   "timeline": ["beginning: ...", "middle: ...", "end: ..."],
   "scene_story": "two dense factual sentences covering how the clip begins, develops, and ends",
-  "caption_anchor": "one complete present-tense sentence of 6-14 words stating one conservative main action or state; capitalize it; do not join two actions with and",
+  "caption_anchor": "one complete present-tense sentence of 6-14 words stating the persistent visible subject, setting, or main state; capitalize it; prefer the scene over a transient motion or camera movement; do not join two actions with and",
   "visible_text": ["only large, central, unquestionably readable text"],
   "do_not_claim": ["plausible but unsupported identities, actions, counts, motives, relationships, brands, locations, audio, or outcomes"]
 }
@@ -210,8 +210,9 @@ DRAFT EVIDENCE:
 """
 
 _VERIFIED3_STYLE_PROMPTS = {
-    "formal": """Write a polished formal caption. State the main visible
-subject, setting, and action or state in one objective sentence. Use concrete
+    "formal": """Write a polished formal caption. State the persistent visible
+subject, setting, and main action or state in one objective sentence. Prefer the
+scene and stable objects over transient motion or camera movement. Use concrete
 details from the verified evidence, with no joke, slang, flourish, or
 speculation.""",
     "sarcastic": """Write with the voice of a weary, sharp observer forced to
@@ -941,7 +942,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
         "champion-r2",
         "persona", "persona-grounded",
     }
-    eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8"}
+    eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "champion-r3"}
     anchors = _eight_anchor_frames(frames) if eight_frame_mode else (_four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames))
     draft_config = _vision_model_config(config) if hybrid_mode else config
     try:
