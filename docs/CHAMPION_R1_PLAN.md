@@ -78,7 +78,7 @@ escaping mistakes:
 
 ## Verification status
 
-- Repository tests: 6 passed.
+- Repository tests: 7 passed.
 - Python compilation and diff check: passed.
 - Local Docker contract smoke: 8 tasks, 8 non-empty four-style result objects.
 - The smoke used a deliberately invalid key, so it validates container and
