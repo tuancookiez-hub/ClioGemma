@@ -50,7 +50,7 @@ localhost URL.
 
 ### Docker image
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-kimi-batch-r1`
+`ghcr.io/tuancookiez-hub/cliogemma:track2-final-r1`
 
 Digest: `sha256:a66cd000cfb8d416e0c23574801839ee7957affa2ab93cd47621e4be7e19eb14`
 
