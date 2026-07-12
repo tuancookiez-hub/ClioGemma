@@ -3,6 +3,10 @@
 **Updated:** 2026-07-12  
 **Track:** AMD Developer Hackathon ACT II, Track 2
 
+> Current release: `gemma4-reference-r3`. This document retains the earlier
+> champion experiments as score history; the five-frame Kimi-evidence/Gemma-
+> writer profile at the end is the active submission candidate.
+
 ## Why the previous candidate failed
 
 The official score sequence is more informative than any single model claim:
@@ -104,8 +108,10 @@ The exact published variants completed all eight retired clips with valid output
 | `gemma4-champion-r3` | 8 | 326.7 s | not used as final control | More temporal detail, but transient-action drift appeared. |
 | `gemma4-champion-r6` | 4 | 247.2 s | 0.723 | Gemma batch writer; label leakage fixed. |
 | `gemma4-kimi-batch-r1` | 8 | 269.8 s | **0.759** | Kimi evidence plus Gemma batch writer/final revision; strongest local candidate. |
+| `gemma4-reference-r3` | 5 | **140.4 s** | pairwise: **31/32 wins** over Kimi batch | Dense Kimi facts, dedicated Gemma style writers, reference-calibrated prompts, no flattening global rewrite. |
 
 The Gemma proxy gave much higher values (0.96+), so the two proxy judges are
 not calibrated to one another. Neither reproduces AMD's hidden evaluator. The
-strongest candidate to test officially is `gemma4-kimi-batch-r1`; retain
-`gemma4-champion-r6` as the Gemma-only control.
+strongest candidate to test officially is `gemma4-reference-r3`; retain
+`gemma4-champion-r6` as the Gemma-only control. The 31/32 figure is a blind
+pairwise preference result on retired examples, not an AMD score prediction.

@@ -8,11 +8,11 @@
 
 ### Short description
 
-> ClioGemma turns short videos into grounded formal, sarcastic, humorous-tech, and humorous-non-tech captions using an evidence-first Gemma 4 pipeline in a reproducible Linux container.
+> ClioGemma turns short videos into grounded formal, sarcastic, humorous-tech, and humorous-non-tech captions using Kimi visual evidence and Gemma 4 caption generation in a reproducible Linux container.
 
 ### Long description
 
-> ClioGemma is a containerized video-captioning agent for AMD Developer Hackathon ACT II, Track 2. It reads `/input/tasks.json`, downloads each clip, and samples four chronological visual anchors with FFmpeg. Novita-hosted Gemma 4 creates and independently verifies a structured scene story, stable facts, timeline, and claims to avoid. Four direct multimodal persona writers produce grounded formal, sarcastic, humorous-tech, and humorous-non-tech captions with evaluator-aligned style guidance. A final Gemma 4 visual grounding revision checks the captions against the evidence before deterministic validation writes exact-schema `/output/results.json`. The public `linux/amd64` image uses only Novita and Gemma, with no separate judge, non-Gemma writer, audio model, or hardcoded evaluator answers.
+> ClioGemma is a containerized video-captioning agent for AMD Developer Hackathon ACT II, Track 2. It reads `/input/tasks.json`, downloads each clip, and samples five chronological visual anchors with FFmpeg. Novita-hosted Kimi K2.6 converts those frames into dense factual evidence: a scene summary, subjects, primary action, stable details, timeline, visible text, and claims to avoid. Four dedicated multimodal Gemma 4 writers then produce formal, sarcastic, humorous-tech, and humorous-non-tech captions with public-guide-aligned style calibration and internal two-angle drafting. Deterministic hallucination, brand, count, cliché, encoding, length, style, and schema checks write exact-contract `/output/results.json`. Kimi provides visual evidence only; Gemma writes every emitted caption.
 
 ### Categories
 
@@ -50,13 +50,13 @@ localhost URL.
 
 ### Docker image
 
-`ghcr.io/tuancookiez-hub/cliogemma:track2-final-r1`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-reference-r3`
 
-Digest: `sha256:a66cd000cfb8d416e0c23574801839ee7957affa2ab93cd47621e4be7e19eb14`
+Digest: `sha256:c4d26f321471cff72685c519b952a0854331a9dcd8a608b533b5c84059e6587e`
 
 ### Additional information
 
-> ClioGemma's submission image is a public `linux/amd64` container that follows the Track 2 contract: it reads `/input/tasks.json`, returns every requested caption style, writes valid `/output/results.json`, and exits cleanly. Kimi K2.6 is used only for chronological visual evidence; Google Gemma 4 performs the evidence verification, all four-style caption writing, internal selection, and final accuracy/style revision. The image uses no non-Gemma caption writer, audio model, or hardcoded evaluator answer. The public Streamlit application is a human-facing demo; the AMD evaluator runs the Docker entrypoint. The restricted, revocable Track 2 credential is not stored in GitHub.
+> ClioGemma's submission image is a public `linux/amd64` container that follows the Track 2 contract: it reads `/input/tasks.json`, returns every requested caption style, writes valid `/output/results.json`, and exits cleanly. Kimi K2.6 is used only for five-frame chronological visual evidence; Google Gemma 4 performs all four dedicated caption-writing roles and internal style selection. Deterministic quality gates prevent malformed encoding, unsupported brands or counts, stock jokes, and invalid output. The image uses no non-Gemma caption writer, audio model, or hardcoded evaluator answer. The exact published image completed all eight retired validation clips in 140.4 seconds with 32/32 captions and passed anonymous pull verification.
 
 ### Gemma-only control
 

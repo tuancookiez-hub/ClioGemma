@@ -13,6 +13,7 @@ from app.evidence_pipeline import (
     _candidate_quality_issues,
     _deterministic_verified_caption,
     _eight_anchor_frames,
+    _five_anchor_frames,
     _four_anchor_frames,
     _parse_verified_evidence,
     _normalize,
@@ -70,6 +71,7 @@ def test_provider_retry_policy_is_bounded() -> None:
 
 def test_verified_evidence_parser_and_style_guard() -> None:
     assert _normalize("**deployment** via `queue`") == "deployment via queue"
+    assert _normalize("thatâ€™s ready") == "that's ready"
     assert "stock style formula" in _candidate_quality_issues(
         "sarcastic",
         "Behold the thrilling spectacle of cars moving through a city road past yellow trees and tall apartment buildings in the background.",
@@ -100,6 +102,18 @@ def test_verified_evidence_parser_and_style_guard() -> None:
         "humorous_tech": "A train travels beside a platform, like a software task waiting on one visible input.",
         "humorous_non_tech": "A train travels beside a platform with an unexpectedly dramatic sense of purpose.",
     })["humorous_tech"]
+    assert "stock style formula" in _caption_batch_issues({
+        "formal": "A train travels beside a platform while trees line the railway in the background.",
+        "sarcastic": "A train travels beside a platform, because apparently rails remain popular today.",
+        "humorous_tech": "A train travels beside a platform like a packet following a stable network route.",
+        "humorous_non_tech": "A train races past the platform like someone who remembered they left the oven on.",
+    })["humorous_non_tech"]
+    assert "unsupported brand claim" in _caption_batch_issues({
+        "formal": "A woman types on an iMac at a white desk inside a modern office.",
+        "sarcastic": "A woman types at a desktop computer, clearly saving civilization one email at a time.",
+        "humorous_tech": "A woman types at a desktop computer like a user feeding requests into a server.",
+        "humorous_non_tech": "A woman types at a desktop computer like someone finishing the final item on a long list.",
+    })["formal"]
     fallback = _deterministic_verified_caption(
         "humorous_tech",
         {"caption_anchor": "A train travels beside a platform"},
@@ -111,6 +125,7 @@ def test_verified3_uses_first_middle_last_and_gemma_caption_model(monkeypatch: p
     frames = [Frame(tmp_path / f"{index}.jpg", index, float(index)) for index in range(5)]
     assert [frame.index for frame in _three_anchor_frames(frames)] == [0, 2, 4]
     assert [frame.index for frame in _four_anchor_frames(frames)] == [0, 1, 3, 4]
+    assert [frame.index for frame in _five_anchor_frames(frames)] == [0, 1, 2, 3, 4]
     assert [frame.index for frame in _eight_anchor_frames(frames)] == [0, 1, 2, 3, 4]
     monkeypatch.setenv("CLIO_ENFORCE_NOVITA", "1")
     monkeypatch.setenv("CLIO_CAPTION_MODEL", "google/gemma-4-31b-it")
@@ -171,3 +186,57 @@ def test_champion_profile_keeps_anchor_and_normalizes_final_caption(monkeypatch:
     assert result["formal"].startswith("A train travels")
     assert "packet" in result["humorous_tech"]
     assert not pipeline._caption_batch_issues(result)
+
+
+def test_reference_profile_uses_kimi_grounding_and_skips_global_rewrite(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import app.evidence_pipeline as pipeline
+
+    frames = []
+    for index in range(5):
+        path = tmp_path / f"reference-{index}.jpg"
+        path.write_bytes(b"frame")
+        frames.append(Frame(path, index, float(index)))
+
+    evidence = {
+        "summary": "A train moves beside a platform. Trees line the railway.",
+        "scene": "outdoor railway platform",
+        "subjects": ["train", "platform", "trees"],
+        "primary_action": "the train moves beside the platform",
+        "stable_facts": ["a train is visible", "a platform is visible", "trees line the railway"],
+        "visual_details": ["metal train", "outdoor platform", "green trees"],
+        "timeline": ["beginning: train approaches", "middle: train passes", "end: train remains visible"],
+        "temporal_arc": "The train changes position beside the platform.",
+        "caption_anchor": "A train moves beside an outdoor platform",
+        "visible_text": [],
+        "do_not_claim": [],
+    }
+    calls: list[tuple[str, str]] = []
+
+    def fake_call(config, content, *, deadline, max_tokens, temperature):
+        prompt = " ".join(str(part.get("text", "")) for part in content if part.get("type") == "text")
+        calls.append((config.model, prompt))
+        if "five chronological images" in prompt:
+            return json.dumps(evidence)
+        if "documentary-quality formal caption" in prompt:
+            return "A train moves beside an outdoor platform as green trees line the railway behind it."
+        if "genuinely sarcastic caption" in prompt:
+            return "A train moves beside a leafy outdoor platform, naturally choosing the one route where getting lost would require genuine effort."
+        if "developer-facing caption" in prompt:
+            return "A train moves beside a tree-lined platform like one well-routed packet following a very visible physical network path."
+        if "broadly relatable everyday joke" in prompt:
+            return "A train moves beside a leafy platform with the confidence of someone who has finally remembered exactly where they parked."
+        raise AssertionError("reference profile unexpectedly invoked another model stage")
+
+    monkeypatch.setattr(pipeline, "_call", fake_call)
+    monkeypatch.setenv("CLIO_PIPELINE", "hybrid-kimi-reference")
+    monkeypatch.setenv("CLIO_VISION_MODEL", "moonshotai/kimi-k2.6")
+    monkeypatch.setenv("CLIO_CAPTION_MODEL", "google/gemma-4-31b-it")
+    monkeypatch.setenv("CLIO_VERIFY_MODEL", "google/gemma-4-31b-it")
+    monkeypatch.setenv("CLIO_ENFORCE_NOVITA", "1")
+    config = ProviderConfig("test", "https://api.novita.ai/openai", "google/gemma-4-31b-it", 25.0)
+    result = pipeline._caption_clip_verified3(frames, "reference-test", config, None)
+    assert set(result) == set(STYLES)
+    assert calls[0][0] == "moonshotai/kimi-k2.6"
+    assert all(model == "google/gemma-4-31b-it" for model, _ in calls[1:])
+    assert not any("Perform one final image-grounded revision" in prompt for _, prompt in calls)
+    assert "well-routed packet" in result["humorous_tech"]

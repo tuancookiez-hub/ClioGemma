@@ -1,44 +1,59 @@
 # ClioGemma - AMD Developer Hackathon ACT II, Track 2
 
 ClioGemma is a Dockerized video-captioning agent. It reads
-`/input/tasks.json`, downloads each video, and writes `/output/results.json`
-with the requested `formal`, `sarcastic`, `humorous_tech`, and
-`humorous_non_tech` captions.
+`/input/tasks.json`, downloads each clip, and writes `/output/results.json`
+with formal, sarcastic, humorous-tech, and humorous-non-tech captions.
 
-The latest confirmed leaderboard score is **0.75**. The strongest confirmed
-control remains **0.85** from the older four-frame `verified5` image. The
-eight-frame pairs/selector experiment scored **0.59**, and the concise
-four-frame candidate scored **0.72**. The current work is a new measured
-Gemma-only recovery candidate; it is not being presented as a guaranteed 0.93.
+## Current score candidate
 
-## Current candidate
+Submit this exact public Linux/amd64 image:
 
-The next release candidate is Novita-only and Gemma-only (`verified5-champion`):
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-reference-r3`
+
+Digest: `sha256:c4d26f321471cff72685c519b952a0854331a9dcd8a608b533b5c84059e6587e`
+
+This is a new, unscored candidate. The latest recorded leaderboard score is
+**0.75**, and the strongest previously confirmed ClioGemma control is **0.85**.
+The new image is not presented as a guaranteed 0.93; only AMD's hidden
+evaluation can establish its official score.
+
+## Architecture
 
 ```text
 video
-  -> four chronological visual anchors
-  -> Gemma 4 factual evidence record with an explicit do-not-claim ledger
-  -> second Gemma 4 visual verification pass
-  -> one direct multimodal writer per style; Gemma internally drafts two angles
-     and keeps the sharper grounded survivor
-  -> Gemma 4 final accuracy/style revision
-  -> deterministic schema, length, cliché, and style validation
-  -> /output/results.json
+  -> five chronological 768px frames
+  -> Kimi K2.6 dense factual grounding through Novita
+     (summary, setting, subjects, primary action, 5-9 stable details,
+      timeline, visible text, uncertainty ledger)
+  -> four dedicated Gemma 4 31B multimodal style writers through Novita
+     (one call per requested style, public-guide style calibration,
+      internal two-angle drafting)
+  -> deterministic hallucination, brand, count, cliché, encoding,
+     length, style, and schema validation
+  -> atomic /output/results.json
 ```
 
-There is no Claude, Kimi, Gemini, external judge, or provider fallback in the
-image. The observer, verifier, persona writers, and final revision all use
-`google/gemma-4-31b-it` through Novita.
+Kimi supplies visual evidence only. Google Gemma 4 writes every caption. The
+reference-calibrated profile deliberately skips the old global rewrite stage,
+which frequently flattened strong jokes into safe generic captions.
 
-This architecture keeps the proven evidence/verification path and restores the
-original detail and creative range that produced the 0.85 control score. It
-adds evaluator-aligned style checks, rejects stock formulas before fallback,
-and preserves the verified anchor in every deterministic fallback.
+## Validation
 
-## Build the leaderboard candidate
+The exact published r3 image completed the eight retired AMD validation clips:
 
-PowerShell:
+- 8/8 tasks and 32/32 requested captions
+- exit code zero in 140.4 seconds at parallelism two
+- valid schema and no deterministic quality-gate failures
+- no empty captions, malformed encoding, or unsupported brand leakage
+- blind comparison against the previous Kimi/Gemma batch candidate: **31 of
+  32 captions preferred**, with one loss on mountain tech humor
+- anonymous GHCR manifest request: HTTP 200
+- clean `docker pull` and Linux/amd64 manifest inspection: passed
+
+The blind comparison is a directional public-set regression test, not AMD's
+hidden scoring model.
+
+## Build
 
 ```powershell
 docker buildx build --platform linux/amd64 `
@@ -47,57 +62,31 @@ docker buildx build --platform linux/amd64 `
   --build-arg CLIO_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_VERIFY_MODEL=google/gemma-4-31b-it `
   --build-arg CLIO_CAPTION_MODEL=google/gemma-4-31b-it `
-  --build-arg CLIO_PIPELINE=verified5-champion `
-  --build-arg SWIFTCLIP_FRAME_COUNT=4 `
+  --build-arg CLIO_VISION_MODEL=moonshotai/kimi-k2.6 `
+  --build-arg CLIO_PIPELINE=hybrid-kimi-reference `
+  --build-arg SWIFTCLIP_FRAME_COUNT=5 `
   --build-arg SWIFTCLIP_FRAME_WIDTH=768 `
   --build-arg SWIFTCLIP_PARALLEL=2 `
-  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-champion-r1 `
+  --tag ghcr.io/tuancookiez-hub/cliogemma:gemma4-reference-r3 `
   --push .
 ```
 
-Track 2 does not inject a provider key. Use a restricted, revocable key and
-rotate it after judging; never commit it to Git.
+Track 2 does not inject a provider key. Use a restricted, revocable credential
+for the scoring image, never commit it to Git, and rotate it after judging.
 
-## Verification status
+## Gemma-only control
 
-- Six repository tests pass.
-- Python compilation passes.
-- The exact balanced source completed all eight retired validation videos: 8/8
-  tasks, 32/32 captions, exit code zero in 218.4 seconds at parallelism two.
-- The pulled balanced public image completed a judge-style test with only
-  `/input` and `/output` mounted: 2/2 tasks, 8/8 captions, valid schema, and
-  exit zero.
-- Anonymous GHCR manifest access returned HTTP 200.
+The strictly Gemma-only control remains:
 
-These are reliability and qualitative checks, not a substitute for the hidden
-AMD score. Only the leaderboard can confirm a score above 0.92.
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-champion-r6`
 
-The source changes for this candidate are documented in
-[docs/CHAMPION_R1_PLAN.md](docs/CHAMPION_R1_PLAN.md). The public image must be
-built and pushed with the user's revocable Novita key before submission.
+Use r3 when the primary objective is the Track 2 leaderboard. Keep r6 only for
+a comparison where every model role must be Gemma.
 
-See [docs/CURRENT_RELEASE_REVIEW.md](docs/CURRENT_RELEASE_REVIEW.md) for the
-score diagnosis, competitor evidence, provenance caveats, and experiment plan.
+## Supporting documents
 
-## Highest-scoring local candidate
-
-The Track 2 guide permits any model. The strongest local retired-set proxy is
-the Kimi-grounded Gemma batch profile:
-
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-kimi-batch-r1`
-
-Digest: `sha256:a66cd000cfb8d416e0c23574801839ee7957affa2ab93cd47621e4be7e19eb14`
-
-Kimi is used only for eight-frame visual evidence; Gemma performs evidence
-verification, all caption writing, internal selection, and final revision. The
-strict local proxy measured 0.759, while the Gemma proxy was much more lenient;
-only AMD can decide the official score. The strictly Gemma-only control remains
-`gemma4-champion-r6`.
-
-See [docs/MODEL_AB_COMPARISON.md](docs/MODEL_AB_COMPARISON.md) and
-[docs/CHAMPION_R1_PLAN.md](docs/CHAMPION_R1_PLAN.md) for the A/B evidence.
-
-## Streamlit demo
-
-The human-facing demo is `streamlit_app.py`. It is separate from the evaluator
-entrypoint. See [docs/STREAMLIT_DEPLOYMENT.md](docs/STREAMLIT_DEPLOYMENT.md).
+- [Current release review](docs/CURRENT_RELEASE_REVIEW.md)
+- [Candidate validation history](docs/CHAMPION_R1_PLAN.md)
+- [Submission form copy](docs/SUBMISSION_FORM_COPY.md)
+- [Local dashboard](docs/LOCAL_DASHBOARD.md)
+- [Streamlit deployment](docs/STREAMLIT_DEPLOYMENT.md)

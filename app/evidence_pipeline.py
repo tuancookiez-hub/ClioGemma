@@ -231,6 +231,27 @@ what happens between images. A nearby hand does not prove writing, opening,
 closing, eating, drinking, or completion. Distinguish camera motion from
 subject motion. Output JSON only."""
 
+_REFERENCE_GROUNDING_PROMPT = """Analyze the five chronological images as one
+short video and return a dense factual JSON record with exactly these keys:
+{
+  "summary": "two concrete sentences describing the whole clip",
+  "scene": "the dominant visible setting",
+  "subjects": ["specific visible people, animals, vehicles, objects, and colors"],
+  "primary_action": "the main visible action or persistent state",
+  "stable_facts": ["5-9 concrete details supported by the images"],
+  "visual_details": ["distinctive clothing, materials, foliage, architecture, weather, surfaces, or background elements"],
+  "timeline": ["beginning: ...", "middle: ...", "end: ..."],
+  "temporal_arc": "one sentence explaining what visibly changes or remains stable",
+  "caption_anchor": "one natural present-tense sentence of 7-16 words naming the main subject, action or state, and setting",
+  "visible_text": ["only unquestionably readable, central text"],
+  "do_not_claim": ["uncertain identity, location, relationship, brand, count, motive, audio, or unseen outcome"]
+}
+Prioritize the dominant scene and main subject over a fleeting gesture or camera
+movement. Compare the images before asserting motion. Be specific rather than
+generic, but put uncertain details in do_not_claim instead of guessing. Do not
+describe frames, image quality, sampling, or the analysis process. Output JSON
+only, without markdown."""
+
 _VERIFIED3_REVIEW_PROMPT = """Act as a strict second visual observer. Compare
 the draft evidence record below against the chronological images. Remove
 or correct every unsupported detail. Preserve useful specificity when it is
@@ -272,6 +293,31 @@ snacks, chores, imagined attitudes, and social situations are allowed as an
 obvious punchline, not as literal claims. Use no technical jargon or niche
 references. Prefer a payoff uniquely suggested by the visible scene; avoid default
 Monday, chores, dinner, kitchen, snack, or 'same confidence as me' formulas.""",
+}
+
+_REFERENCE_STYLE_CALIBRATION = {
+    "formal": """Write a documentary-quality formal caption: one polished,
+objective sentence naming the main subject, primary action or state, setting,
+and two concrete visible details. Use natural language, not an inventory.
+Style pattern only: "A young orange kitten sits among dense green foliage,
+looking directly toward the viewer." Never copy the example's facts.""",
+    "sarcastic": """Write a genuinely sarcastic caption with a factual visual
+setup and one dry, lightly mocking payoff. Understatement and contrast work
+better than announcing that something is exciting or ordinary. The payoff may
+invent an obviously comic attitude, but must not assert a new literal event.
+Style pattern only: "A city finally invested in trees, an achievement apparently
+worthy of its own parade." Never copy the example's facts.""",
+    "humorous_tech": """Write a funny developer-facing caption. Name the real
+visible subject and action first, then map one scene-specific relationship to
+exactly one coherent technical concept. The joke must land; do not merely insert
+software nouns. Style pattern only: "Nature shipped its autumn update: every
+leaf node changed color with no rollback required." Never copy the example's
+facts.""",
+    "humorous_non_tech": """Write a warm, broadly relatable everyday joke. Name
+the real visible subject and action, then add one playful comparison or imagined
+attitude clearly presented as humor. No technical jargon. Style pattern only:
+"The trees put on the best show in town while everyone else sat in traffic."
+Never copy the example's facts.""",
 }
 
 _VERIFIED4_FINAL_PROMPT = """Perform one final image-grounded revision of the
@@ -336,10 +382,10 @@ _TECH = {
     "algorithm", "api", "balancer", "bandwidth", "binary", "bug", "cache",
     "code", "commit", "compile", "cpu", "database", "debug", "deploy",
     "deployment", "download", "endpoint", "gpu", "hotfix", "input", "interface",
-    "json", "kernel", "latency", "log", "memory", "middleware", "network", "packet",
+    "app", "json", "kernel", "latency", "layer", "log", "memory", "middleware", "network", "packet",
     "pipeline", "process", "program", "queue", "regex", "render", "repo",
     "rollback", "runtime", "scheduler", "script", "server", "software", "stack",
-    "state", "thread", "ui", "upload", "wifi",
+    "state", "thread", "ui", "upload", "wifi", "zoom",
 }
 _SPECULATIVE = re.compile(
     r"\b(probably|likely|decid(?:e|es|ed|ing)|wants?|wanted|remembers?|pretends?|"
@@ -356,8 +402,13 @@ _RELATIONSHIP = re.compile(
     r"coworkers?|colleagues?|couples?|husbands?|wives|daughters?|sons?|kids?)\b",
     re.I,
 )
+_BRAND = re.compile(
+    r"\b(?:adidas|apple|coca[- ]?cola|facebook|google|imac|instagram|macbook|nike|starbucks|tesla|tiktok|youtube)\b",
+    re.I,
+)
 _AWKWARD_TECH = re.compile(r"\b(running runtime|physical cache|sign (?:as|is) an api|scheduler scheduling)\b", re.I)
 _DURATION = re.compile(r"\b\d+(?:\.\d+)?\s+(?:seconds?|minutes?|hours?)\b", re.I)
+_UNSTABLE_COUNT = re.compile(r"\b(?:hundreds|thousands|millions)\b", re.I)
 
 
 def _remaining(deadline: float | None) -> float | None:
@@ -442,6 +493,15 @@ def _normalize(raw: str) -> str:
     fenced = re.search(r"```(?:text|markdown)?\s*(.*?)```", text, re.I | re.S)
     if fenced:
         text = fenced.group(1).strip()
+    text = (
+        text.replace("â€™", "'")
+        .replace("â€˜", "'")
+        .replace("â€œ", '"')
+        .replace("â€", '"')
+        .replace("â€”", "—")
+        .replace("â€“", "–")
+        .replace("Â", "")
+    )
     text = re.sub(r"(?:\*\*|__|`)", "", text)
     text = re.sub(r"^(?:caption[_ ]?anchor|caption)\s*(?:[:\-]\s*)?", "", text, flags=re.I)
     return re.sub(r"\s+", " ", text).strip(" \t\"'")
@@ -496,13 +556,19 @@ def _style_issues(style: str, caption: str) -> list[str]:
         issues.append("speculative intent")
     if style == "formal" and _RELATIONSHIP.search(caption):
         issues.append("inferred relationship")
+    if _BRAND.search(caption):
+        issues.append("unsupported brand claim")
     if style == "formal" and _DURATION.search(caption):
         issues.append("precise duration")
+    if _UNSTABLE_COUNT.search(caption):
+        issues.append("unsupported approximate count")
     hits = {word for word in _TECH if re.search(rf"\b{re.escape(word)}s?\b", caption, re.I)}
     if style == "humorous_tech" and not hits:
         issues.append("missing tech comparison")
     if style == "humorous_tech" and _AWKWARD_TECH.search(caption):
         issues.append("awkward or incorrect tech analogy")
+    if style == "humorous_tech" and len(hits) > 3:
+        issues.append("stacked tech jargon")
     if style == "humorous_non_tech" and hits:
         issues.append("technical jargon")
     if caption.count('"') % 2 or caption.count("“") != caption.count("”"):
@@ -530,7 +596,7 @@ _STOCK_STYLE = {
     "humorous_non_tech": re.compile(
         r"\b(?:on a |every )?monday\b|what (?:to|i should) (?:eat|have) for dinner|"
         r"walked into the kitchen|finish all my chores|three different snacks|same confidence as me|"
-        r"unexpectedly dramatic sense of purpose",
+        r"unexpectedly dramatic sense of purpose|left the oven on",
         re.I,
     ),
 }
@@ -703,6 +769,13 @@ def _four_anchor_frames(frames: list[Frame]) -> list[Frame]:
     return [frames[round(last * index / 3)] for index in range(4)]
 
 
+def _five_anchor_frames(frames: list[Frame]) -> list[Frame]:
+    if len(frames) <= 5:
+        return frames
+    last = len(frames) - 1
+    return [frames[round(last * index / 4)] for index in range(5)]
+
+
 def _eight_anchor_frames(frames: list[Frame]) -> list[Frame]:
     if len(frames) <= 8:
         return frames
@@ -747,6 +820,7 @@ def _write_verified3_style(
     concise: bool = False,
     balanced: bool = False,
     champion: bool = False,
+    reference_calibrated: bool = False,
 ) -> str:
     anchor = _normalize_anchor(str(evidence.get("caption_anchor", "")))
     prior_note = ""
@@ -757,7 +831,7 @@ def _write_verified3_style(
             + "\nUse a different sentence shape and comedic angle while preserving the same visible facts."
         )
     anchor_note = ""
-    if anchor and style == "formal":
+    if anchor and style == "formal" and not reference_calibrated:
         anchor_note = (
             "\n\nBegin with this exact verified factual clause, unchanged: "
             + anchor
@@ -778,10 +852,12 @@ def _write_verified3_style(
     internal_selection = (
         " Before answering, silently draft two different angles, delete any detail not in VERIFIED EVIDENCE, "
         "and return only the sharper, more natural survivor."
-        if balanced
+        if balanced or reference_calibrated
         else ""
     )
     length_rule = (
+        "Aim for 22-32 words, hard bounds 16-38, with one polished sentence or two short sentences"
+    ) if reference_calibrated else (
         "Aim for 18-28 words, hard bounds 14-32, with one crisp factual sentence"
         if style == "formal"
         else "Aim for 15-28 words, hard bounds 12-32, with one crisp sentence or two short sentences"
@@ -791,7 +867,15 @@ def _write_verified3_style(
         else "Aim for 16-28 words, hard bounds 12-32, with one crisp sentence or two short sentences"
     ) if concise else ("Write 18-48 words" if style == "formal" else "Write 12-40 words")
     calibration = ""
-    if concise:
+    if reference_calibrated:
+        calibration = (
+            "\n\nREFERENCE-CALIBRATED STYLE RUBRIC:\n"
+            + _REFERENCE_STYLE_CALIBRATION[style]
+            + "\nKeep at least two concrete scene details. A creative punchline may contain an "
+            "obviously figurative motive, comparison, or imagined consequence; that is style, not a literal claim. "
+            "The factual setup must remain true. Avoid generic jokes that could fit any clip."
+        )
+    elif concise:
         calibration = (
             "\n\nSTYLE CALIBRATION EXAMPLES — style patterns only; never copy their facts:\n"
             "formal: A city boulevard lined with autumn trees carries steady traffic beneath apartment towers.\n"
@@ -839,7 +923,9 @@ def _write_verified3_style(
         + json.dumps(evidence, ensure_ascii=False, indent=2)
     )
     persona_mode = bool(frames)
-    temperature = 0.15 if style == "formal" else (0.65 if concise else (0.70 if champion else (0.82 if persona_mode else 0.7)))
+    temperature = 0.12 if style == "formal" else (
+        0.78 if reference_calibrated else (0.65 if concise else (0.70 if champion else (0.82 if persona_mode else 0.7)))
+    )
     content = _timeline_content(frames, prompt) if frames else [{"type": "text", "text": prompt}]
     caption = _normalize(
         _call(
@@ -851,7 +937,8 @@ def _write_verified3_style(
         )
     )
     issues = _style_issues(style, caption)
-    issues.extend(_anchor_style_issues(style, caption, anchor))
+    anchor_check_style = "sarcastic" if reference_calibrated else style
+    issues.extend(_anchor_style_issues(anchor_check_style, caption, anchor))
     if not issues:
         return caption
     repair_prompt = (
@@ -872,7 +959,7 @@ def _write_verified3_style(
             )
         )
         repaired_issues = _style_issues(style, repaired)
-        repaired_issues.extend(_anchor_style_issues(style, repaired, anchor))
+        repaired_issues.extend(_anchor_style_issues(anchor_check_style, repaired, anchor))
         if len(repaired_issues) < len(issues):
             return repaired
     except Exception as error:
@@ -957,10 +1044,11 @@ def _deterministic_verified_caption(style: str, evidence: dict) -> str:
 
 def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
+    reference_mode = pipeline in {"hybrid-kimi-reference", "reference-r1", "score-r1"}
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
     champion_mode = pipeline in {"verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "champion-r2"}
     batch_mode = pipeline in {"champion-batch", "gemma-champion-batch", "champion-r4", "hybrid-kimi-batch", "kimi-grounded-batch"}
-    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch"}
+    hybrid_mode = pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "hybrid-kimi-reference", "reference-r1", "score-r1"}
     hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch"}
     balanced_mode = pipeline in {
         "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
@@ -968,6 +1056,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
         "hybrid-kimi8", "kimi-grounded8", "verified5-champion", "verified-5-champion",
         "champion-r3", "champion-r2", "gemma-champion", "champion-batch", "gemma-champion-batch", "champion-r4",
         "hybrid-kimi-batch", "kimi-grounded-batch",
+        "hybrid-kimi-reference", "reference-r1", "score-r1",
     }
     persona_mode = pipeline in {
         "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise",
@@ -976,15 +1065,19 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
         "verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion",
         "champion-r2", "champion-batch", "gemma-champion-batch", "champion-r4",
         "hybrid-kimi-batch", "kimi-grounded-batch",
+        "hybrid-kimi-reference", "reference-r1", "score-r1",
         "persona", "persona-grounded",
     }
     eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "champion-r3", "hybrid-kimi-batch", "kimi-grounded-batch"}
-    anchors = _eight_anchor_frames(frames) if eight_frame_mode else (_four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames))
+    anchors = _five_anchor_frames(frames) if reference_mode else (
+        _eight_anchor_frames(frames) if eight_frame_mode else (_four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames))
+    )
     draft_config = _vision_model_config(config) if hybrid_mode else config
+    grounding_prompt = _REFERENCE_GROUNDING_PROMPT if reference_mode else _VERIFIED3_DRAFT_PROMPT
     try:
         draft_raw = _call(
             draft_config,
-            _timeline_content(anchors, _VERIFIED3_DRAFT_PROMPT),
+            _timeline_content(anchors, grounding_prompt),
             deadline=deadline,
             max_tokens=650,
             temperature=0.15,
@@ -1043,6 +1136,7 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                     concise_mode,
                     balanced_mode,
                     champion_mode,
+                    reference_mode,
                 )
             except Exception as error:
                 _log(f"verified3 {style} writer unavailable; using evidence-bound local caption: {error}")
@@ -1239,6 +1333,7 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
         "verified5-champion", "verified-5-champion", "champion-r3", "champion-r2", "gemma-champion",
         "champion-batch", "gemma-champion-batch", "champion-r4",
         "hybrid-kimi-batch", "kimi-grounded-batch",
+        "hybrid-kimi-reference", "reference-r1", "score-r1",
         "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline)

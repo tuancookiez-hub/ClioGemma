@@ -1,22 +1,26 @@
-# Current release review - champion R1 candidate
+# Current release review - reference R3 candidate
 
 **Updated:** 2026-07-12
 
 **Track:** AMD Developer Hackathon ACT II, Track 2 - Video Captioning
 
-**Production policy:** Novita provider; Gemma family only; no non-Gemma writer or separate judge
+**Production policy:** Novita provider; Kimi visual evidence; Gemma-only caption writing; no separate external judge
 
 ## Executive decision
 
-Build and quality-test this new candidate before submitting:
+Submit this exact tested candidate:
 
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-kimi-batch-r1`
+`ghcr.io/tuancookiez-hub/cliogemma:gemma4-reference-r3`
+
+Digest: `sha256:c4d26f321471cff72685c519b952a0854331a9dcd8a608b533b5c84059e6587e`
 
 The latest confirmed ClioGemma score is **0.75**. The strongest confirmed
 control is **0.85**, earned by the older four-frame `verified5` architecture.
 The eight-frame pairs/selector experiment scored **0.59** and the concise
 four-frame follow-up scored **0.72**. Local testing establishes contract,
 runtime, and qualitative readiness; it does not prove a score above 0.92.
+The r3 image completed all eight retired clips in 140.4 seconds and won 31 of
+32 blind caption comparisons against the previous Kimi/Gemma batch candidate.
 
 ## Official score history
 
@@ -33,6 +37,7 @@ runtime, and qualitative readiness; it does not prove a score above 0.92.
 | `gemma4-champion-r1` | Gemma-only four-frame path with internal best-of-two drafting, stock rejection, anchor-preserving fallbacks, and final accuracy/style revision | Pending |
 | `gemma4-champion-r6` | Gemma-only four-frame batch writer with label normalization | Pending |
 | `gemma4-kimi-batch-r1` | Kimi eight-frame evidence, Gemma verification, Gemma batch writing and final revision | Pending |
+| `gemma4-reference-r3` | Kimi five-frame dense evidence, dedicated reference-calibrated Gemma writers, targeted deterministic gates, no global rewrite | Pending |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.
@@ -112,49 +117,45 @@ Gemma 4. See [MODEL_AB_COMPARISON.md](MODEL_AB_COMPARISON.md).
 
 Repository validation:
 
-- `python -m pytest tests -q`: 6 passed
+- `python -m pytest tests -q`: 8 passed
 - `python -m compileall -q app tests`: passed
 - `git diff --check`: passed
 
-Exact balanced source on all eight retired AMD videos:
+Exact reference-r3 image on all eight retired AMD videos:
 
 - 8/8 tasks
 - 32/32 requested captions
 - valid style keys and non-empty values
 - exit code 0
-- 310.5 seconds at task parallelism two
+- 140.4 seconds at task parallelism two
 - no provider or schema failures
 
 Published artifact validation:
 
 - public Linux/amd64 OCI manifest
 - anonymous registry request: HTTP 200
-- pulled digest: `sha256:9dcc777f1e80256fecee64fbfa3f105f549e5b0e38c3f9100098ec21fefe824f`
+- pulled digest: `sha256:c4d26f321471cff72685c519b952a0854331a9dcd8a608b533b5c84059e6587e`
 - judge-style run with no source mount and no environment override
-- 2/2 retired tasks, 8/8 captions, valid schema, exit code 0
+- 8/8 retired tasks, 32/32 captions, valid schema, exit code 0
 
 ## Score assessment
 
-The champion image is a controlled attempt to recover the 0.85 Gemma-only
-architecture after the 0.75 submission. It keeps four-frame evidence and adds
-internal best-of-two drafting, stock-style rejection, anchor-preserving
-fallbacks, and a final accuracy/style pass.
-
-The separate `gemma4-kimi-batch-r1` profile is currently the strongest local
-retired-set candidate: Kimi supplies eight-frame evidence, while Gemma owns all
-verification and caption generation. Its strict proxy score was **0.759**;
-this is not an AMD score.
+`gemma4-reference-r3` is the strongest locally validated candidate. Kimi
+supplies dense five-frame evidence, while Gemma owns every caption-writing role.
+Dedicated reference-calibrated writers preserve style identity, and the old
+global rewrite stage is disabled so it cannot genericize otherwise strong jokes.
+The exact image completed all eight retired clips in 140.4 seconds and won 31
+of 32 blind caption comparisons against `gemma4-kimi-batch-r1`.
 
 There is still no defensible way to simulate the hidden AMD score exactly. The
 hidden clips, reference expectations, judge prompt, weighting, and stochastic
-provider behavior are unavailable. A reasonable pre-submission expectation is
-**0.82-0.90**. A 0.93 result remains the target, not a forecast; only the hidden
-AMD judge can establish it.
+provider behavior are unavailable. The 31/32 public-set advantage is meaningful
+regression evidence, but it is not a calibrated numerical forecast. A 0.93 result
+remains the target; only the hidden AMD judge can establish it.
 
 ## Next experiment policy
 
-1. Build and quality-test `gemma4-champion-r1`, then submit that immutable tag
-   once and record its digest and score.
+1. Submit `gemma4-reference-r3` once and record its digest and official score.
 2. Do not mutate this tag. Every later experiment gets a new tag.
 3. If the score is below 0.90, inspect whether the failure is accuracy, style,
    or incomplete outputs before changing architecture. Do not resubmit the same
@@ -170,10 +171,10 @@ AMD judge can establish it.
 
 - [x] Track 2 input/output contract preserved.
 - [x] Linux/amd64 entrypoint and exact requested style keys preserved.
-- [x] Novita-only and Gemma-only production roles enforced.
+- [x] Novita-only provider, Kimi evidence role, and Gemma-only caption writing enforced.
 - [x] Repository tests and compilation pass.
 - [x] All eight retired validation clips pass within the 570-second budget.
 - [x] Immutable public tag pushed.
 - [x] Anonymous pull access and manifest digest verified.
-- [x] Exact published balanced image passes a mounted input/output smoke test.
+- [x] Exact published r3 image passes the full eight-clip mounted input/output test.
 - [ ] Submit the exact tag and record the official score.
