@@ -4,7 +4,18 @@ ClioGemma is a Dockerized video-captioning agent. It reads
 `/input/tasks.json`, downloads each clip, and writes `/output/results.json`
 with formal, sarcastic, humorous-tech, and humorous-non-tech captions.
 
-## Current release candidates
+## Recommended Track 2 submission
+
+Track 2 has one submission; Gemma recognition is an award within that track.
+
+`ghcr.io/tuancookiez-hub/cliogemma:score-max-r10-gemma-stable`
+
+Digest: `sha256:70a03959943645e979e724a7ebdb6cae5981dfc0c7bb385aa5d3464eb33c08aa`
+
+This image uses Kimi K2.6 for dense visual evidence and Gemma 4 for caption
+generation, selection, verification, repair, and emitted captions.
+
+## Earlier research candidates
 
 Gemma-track control:
 
@@ -24,12 +35,11 @@ Variance-controlled broad candidate:
 
 Digest: `sha256:9d2cd8fa19a82dc5e5caecb4eb71c88863665a125e273433003608317b296152`
 
-This is a new, unscored candidate. The latest recorded leaderboard score is
-**0.77**, and the strongest previously confirmed ClioGemma control is **0.85**.
-Neither image is presented as a guaranteed 0.93; only AMD's hidden evaluation
-can establish the official score. Use r6 when Gemma-track eligibility is the
-priority; use r8 for the high-variance broad route or r9 for the same route
-with output-variance control when supporting non-Gemma writers are permitted.
+The latest recorded leaderboard score is **0.77**, and the strongest previously
+confirmed ClioGemma control is **0.85**. No candidate is presented as a
+guaranteed 0.93; only AMD's hidden evaluation can establish the official score.
+The r8/r9 images remain research branches and should not replace r10 for this
+single-entry competition.
 
 ## Architecture
 
@@ -49,14 +59,14 @@ video
   -> atomic /output/results.json
 ```
 
-Kimi/Qwen supplies visual evidence and candidate diversity. Google Gemma 4 owns
-verification and final grounding in both candidates. r6 preserves Gemma-only
-caption roles for the Gemma track; r8 follows the source-derived independent
-style-writer split.
+Kimi supplies visual evidence and candidate diversity. Google Gemma 4 owns
+verification, final grounding, and every emitted caption in the recommended
+r10 image. The r8/r9 DeepSeek writer branch is retained only as research.
 
 ## Validation
 
-The published r6 and r8 images completed the eight retired AMD validation clips:
+The published r6 and r8 images completed the eight retired AMD validation clips;
+r10 preserves the same contract with the stability profile enabled:
 
 - 8/8 tasks and 32/32 requested captions
 - r6 completed within the 570-second contract; r8 completed in 272.3 seconds at parallelism three
@@ -69,7 +79,7 @@ hidden scoring model.
 
 ## Build profiles
 
-The immutable images are already published. The Gemma-track build profile is:
+The immutable recommended image is already published. Its build profile is:
 
 ```powershell
 docker buildx build --platform linux/amd64 `
@@ -84,8 +94,9 @@ docker buildx build --platform linux/amd64 `
   --build-arg SWIFTCLIP_FRAME_COUNT=16 `
   --build-arg SWIFTCLIP_FRAME_WIDTH=768 `
   --build-arg CLIO_GRID_INPUT=1 `
+  --build-arg CLIO_STABILITY_MODE=1 `
   --build-arg SWIFTCLIP_PARALLEL=3 `
-  --tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r6-grid `
+  --tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r10-gemma-stable `
   --push .
 ```
 
@@ -96,15 +107,6 @@ style writer: `CLIO_VISION_MODEL=qwen/qwen3.5-397b-a17b`,
 
 Track 2 does not inject a provider key. Use a restricted, revocable credential
 for the scoring image, never commit it to Git, and rotate it after judging.
-
-## Gemma-only control
-
-The strictly Gemma-only control remains:
-
-`ghcr.io/tuancookiez-hub/cliogemma:gemma4-champion-r6`
-
-Use r6 when Gemma-track eligibility is the priority. Use r8 when the broad
-Track 2 score is the priority and non-Gemma supporting writers are permitted.
 
 ## Supporting documents
 

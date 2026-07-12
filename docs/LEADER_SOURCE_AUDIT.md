@@ -125,22 +125,19 @@ previous `score-max-r5` tag:
 | `score-max-r6-grid` | Novita Kimi K2.6, up to 16 scene-aware frames in chronological 4x4 grids | Gemma 4 verification, selection, and repair | 8/8 clips and 32/32 captions; completed within the 570-second contract |
 | `score-max-r8-qwen-deepseek` | Novita Qwen3.5 multimodal, same chronological grids | Gemma 4 evidence verification/final grounding with DeepSeek V4 Pro style drafting | 8/8 clips and 32/32 captions; completed within the 570-second contract |
 | `score-max-r9-stable` | r8 architecture with deterministic stability profile | Near-zero evidence/final sampling; bounded creative temperature | Published immutable candidate; intended to reduce output variance, not a guaranteed score increase |
+| `score-max-r10-gemma-stable` | Kimi K2.6 chronological grids with the same stability profile | Gemma 4 generates, selects, verifies, repairs, and emits every caption | Published single-submission candidate; no DeepSeek writer in the emitted path |
 
 The r8 candidate is the closest source-derived analogue: the image model sees
 the dense temporal grids, while a text model writes each style independently.
-It is deliberately separate from the Gemma-only r6 control so the Gemma track
-and the general Track 2 leaderboard can be evaluated independently.
 The r9 tag keeps that architecture but clamps evidence and final sampling to
 near-zero and creative sampling to a bounded level. It targets our output
 variance; it does not claim the hidden judge itself is deterministic.
+For the single Track 2 submission, r10 is the recommended compromise: it keeps
+Gemma as the load-bearing caption model while retaining the dense-grid and
+Kimi-grounding improvements.
 
 ## Next experiment
 
 The implementation phase is complete. Do not run another full public-set
-benchmark merely to create activity. Submit one immutable candidate, record its
-digest and official score, then make the next change only from the evaluator's
-result. If Gemma-track eligibility is the priority, use r6; if the broad Track
-2 score is the priority and non-Gemma supporting writers are permitted, use r8.
-candidate. r9 applies the same architecture with variance control after the
-nondeterminism concern: it does not claim that the hidden judge itself is
-deterministic.
+benchmark merely to create activity. Submit the immutable r10 digest and record
+the official score, then make the next change only from the evaluator's result.
