@@ -437,6 +437,7 @@ def _normalize(raw: str) -> str:
     if fenced:
         text = fenced.group(1).strip()
     text = re.sub(r"(?:\*\*|__|`)", "", text)
+    text = re.sub(r"^(?:caption[_ ]?anchor|caption)\s*[:\-]\s*", "", text, flags=re.I)
     return re.sub(r"\s+", " ", text).strip(" \t\"'")
 
 
