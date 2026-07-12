@@ -684,6 +684,7 @@ def _write_verified3_style(
     deadline: float | None,
     frames: list[Frame] | None = None,
     concise: bool = False,
+    balanced: bool = False,
 ) -> str:
     anchor = _normalize_anchor(str(evidence.get("caption_anchor", "")))
     prior_note = ""
@@ -726,6 +727,15 @@ def _write_verified3_style(
             "humorous_tech: Nature's annual deployment updates the leaf nodes to yellow while the traffic queue keeps processing.\n"
             "humorous_non_tech: The trees planned a better show than the people stuck underneath them.\n"
             "Prefer a precise visible detail and one clean style beat over a long inventory. Avoid filler, invented names, and explanations."
+        )
+    elif balanced:
+        calibration = (
+            "\n\nEVALUATOR-ALIGNED STYLE CHECK — use these as style patterns only; never copy their facts:\n"
+            "formal: lead with the visible subject, action or state, and setting; add one or two concrete details. Keep it objective and professional.\n"
+            "sarcastic: state the visible situation first, then add one dry contrast, understatement, or mock consequence.\n"
+            "humorous_tech: state the visible situation first, then use exactly one coherent software or technology analogy tied to that action.\n"
+            "humorous_non_tech: state the visible situation first, then use one relatable everyday comparison suggested by the scene.\n"
+            "Prefer a complete, natural caption with concrete detail over a compressed fragment or a stack of jokes. Make the punchline hinge on the visible action, not just the topic. Never invent numeric quantities, durations, names, locations, or literal unseen outcomes, even in a joke."
         )
     prompt = (
         _VERIFIED3_STYLE_PROMPTS[style]
@@ -834,7 +844,8 @@ def _deterministic_verified_caption(style: str, evidence: dict) -> str:
 def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderConfig, deadline: float | None) -> dict[str, str]:
     pipeline = os.environ.get("CLIO_PIPELINE", "").strip().lower()
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
-    persona_mode = pipeline in {"verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "persona", "persona-grounded"}
+    balanced_mode = pipeline in {"verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced"}
+    persona_mode = pipeline in {"verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "persona", "persona-grounded"}
     anchors = _four_anchor_frames(frames) if persona_mode else _three_anchor_frames(frames)
     try:
         draft_raw = _call(
@@ -875,13 +886,14 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
                 deadline,
                 anchors if persona_mode else None,
                 concise_mode,
+                balanced_mode,
             )
         except Exception as error:
             _log(f"verified3 {style} writer unavailable; using evidence-bound local caption: {error}")
             caption = _deterministic_verified_caption(style, evidence)
         captions[style] = caption
         prior.append(caption)
-    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "persona", "persona-grounded"}:
+    if pipeline in {"verified4", "verified-4", "champion", "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise", "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced", "persona", "persona-grounded"}:
         final_prompt = _VERIFIED4_FINAL_PROMPT.format(
             evidence=json.dumps(evidence, ensure_ascii=False, indent=2),
             captions=json.dumps(captions, ensure_ascii=False, indent=2),
@@ -890,6 +902,12 @@ def _caption_clip_verified3(frames: list[Frame], task_id: str, config: ProviderC
             "Prefer one sentence or two short sentences, preserving one concrete visible detail and one clear style beat."
             if concise_mode else ""
         )
+        if balanced_mode:
+            final_prompt += (
+                "\nFor this balanced profile, retain useful concrete detail and natural sentence length. "
+                "Remove unsupported numbers, durations, names, locations, props, or literal unseen outcomes even when they appear inside a joke. "
+                "Keep each creative punchline tied to the specific visible action or transformation."
+            )
         try:
             reviewed_raw = _call(
                 verify_config,
@@ -1037,7 +1055,8 @@ def caption_clip_evidence(frames: list[Frame], task_id: str, model: Optional[str
         "verified3", "verified-3", "verified-sequential",
         "verified4", "verified-4", "champion",
         "verified5", "verified-5", "verified5-concise", "verified-5-concise",
-        "precision", "concise", "persona", "persona-grounded",
+        "precision", "concise", "verified5-balanced", "verified-5-balanced",
+        "stylecal", "rebalanced", "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline)
     if pipeline in {"verified2", "verified-2", "two-stage"}:

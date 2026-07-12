@@ -36,7 +36,7 @@ directions.
 1. Receive a video task.
 2. Sample four chronological moments.
 3. Build and verify a factual record.
-4. Write one concise caption for each requested style.
+4. Write one grounded caption for each requested style with evaluator-aligned style guidance.
 5. Run a final Gemma grounding revision against the evidence.
 6. Return evaluator-ready JSON.
 
@@ -48,7 +48,7 @@ flowchart LR
     B --> C["4 chronological anchors"]
     C --> D["Gemma 4 evidence record"]
     D --> E["Gemma 4 visual verification"]
-    E --> F["4 concise persona writers"]
+    E --> F["4 grounded persona writers"]
     F --> G["Final Gemma grounding revision"]
     G --> H["Schema validation"]
     H --> I["/output/results.json"]
