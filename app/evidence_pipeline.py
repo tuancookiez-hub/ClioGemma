@@ -1649,6 +1649,7 @@ def caption_clip_evidence(
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
         "fast-kimi-gemma", "kimi-gemma-fast",
+        "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded",
         "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline, ocr_text=ocr_text)
