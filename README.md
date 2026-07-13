@@ -85,6 +85,11 @@ reviews that evidence against the chronological contact sheet, and Gemma then
 writes all four captions from the reviewed evidence and images. This follows r16
 smoke evidence that two Kimi visual noun errors still propagated to the output.
 
+The strongest measured perception variant is
+`score-max-r18-qwen-gemma-verified`: Qwen3.5 supplies the evidence, while Gemma
+reviews it and emits every final caption. On focused public clips it corrected
+the Kimi zucchini and track-detail errors without changing the output contract.
+
 See [the r15 plan](docs/R15_GROUNDED_BATCH_PLAN.md) for the exact build command
 and rationale.
 

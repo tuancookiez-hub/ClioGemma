@@ -95,8 +95,28 @@ runner limit remains 570 seconds.
 ```powershell
 .\scripts\build_r15_grounded.ps1 `
   -Pipeline score-max-r17-verified-grounded `
+  -VisionModel moonshotai/kimi-k2.6 `
   -ClipTimeout 105 `
   -RequestTimeout 40 `
   -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r17-verified-grounded `
+  -Push
+```
+
+## Qwen perception diagnostic and r18 package
+
+On the v7/v8 smoke, replacing only the Kimi evidence model with
+`qwen/qwen3.5-397b-a17b` corrected the two recurring Kimi errors: zucchini was
+identified correctly and the track was described with white lane markings.
+Gemma remained the visual reviewer and emitted all four captions. This is the
+strongest measured configuration so far for general Track 2; it still uses
+Gemma for every final caption.
+
+```powershell
+.\scripts\build_r15_grounded.ps1 `
+  -Pipeline score-max-r17-verified-grounded `
+  -VisionModel qwen/qwen3.5-397b-a17b `
+  -ClipTimeout 105 `
+  -RequestTimeout 40 `
+  -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r18-qwen-gemma-verified `
   -Push
 ```
