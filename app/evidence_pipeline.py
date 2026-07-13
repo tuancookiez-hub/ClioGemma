@@ -142,7 +142,9 @@ style and text fields. Do not include reasoning or Markdown."""
 
 _CHAMPION_BATCH_PROMPT = """You are the final Gemma writer for a strict video-captioning
 benchmark. You can see the labelled chronological images and the verified evidence
-below. The images are the source of truth; the evidence is a safety constraint.
+below. The images are the source of truth; the evidence is a safety guide, not a
+replacement for visual verification. If a noun, color, action, or timeline detail
+in the evidence conflicts with what is clearly visible, correct it from the images.
 Return exactly four string keys: formal, sarcastic, humorous_tech, humorous_non_tech.
 
 Silently draft two alternatives for each style, remove unsupported literal details,
@@ -161,8 +163,10 @@ event, identity, location, count, or backstory.
 
 humorous_tech: state the literal scene first, then exactly one coherent software or
 technology analogy tied to the visible relationship or action. Use concrete scene
-details; avoid generic scheduler, queue, packet, deployment, or workplace jokes when
-they could fit any video.
+details; make the mapping about what is visibly happening (movement, repetition,
+input, grouping, or transformation), not just the name of an object. Avoid generic
+scheduler, queue, packet, deployment, or workplace jokes when they could fit any
+video.
 
 humorous_non_tech: state the literal scene first, then one relatable everyday
 comparison suggested by that scene. Use no technical jargon and do not turn an
@@ -172,6 +176,12 @@ Never write meta phrases such as "the visible action", "the subject", or "the
 requested style". Never copy the evidence labels. Never add names, brands, exact
 counts, motives, relationships, audio, duration, or unseen outcomes. Output JSON only;
 do not prefix values with labels such as "formal:" or "Caption_anchor".
+
+Before returning, silently check every caption against the complete image sequence:
+verify the central subject, object identity, colors, setting, and main action; resolve
+any evidence/image conflict in favor of the images; keep the factual setup concrete;
+and ensure each creative caption contains one clear, scene-specific style beat rather
+than a reusable template.
 
 VERIFIED EVIDENCE:
 {evidence}"""
@@ -1299,9 +1309,10 @@ def _caption_clip_verified3(
         "fast-kimi-gemma-grounded",
         "kimi-gemma-grounded-fast",
         "score-max-r15-grounded",
+        "score-max-r16-visual-override",
     }
     score_max_mode = pipeline in {"score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
-    reference_mode = pipeline in {"hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1", "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded"}
+    reference_mode = pipeline in {"hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1", "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override"}
     gemma_reference_mode = pipeline in {"gemma-reference", "reference-gemma-r1"}
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
     champion_mode = pipeline in {"verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "champion-r2"}
@@ -1316,7 +1327,7 @@ def _caption_clip_verified3(
         "hybrid-kimi-batch", "kimi-grounded-batch",
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
-        "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded",
+        "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override",
     }
     persona_mode = pipeline in {
         "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise",
@@ -1327,7 +1338,7 @@ def _caption_clip_verified3(
         "hybrid-kimi-batch", "kimi-grounded-batch",
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
-        "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded",
+        "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override",
         "persona", "persona-grounded",
     }
     eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "champion-r3", "hybrid-kimi-batch", "kimi-grounded-batch"}
@@ -1649,7 +1660,7 @@ def caption_clip_evidence(
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
         "fast-kimi-gemma", "kimi-gemma-fast",
-        "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded",
+        "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override",
         "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline, ocr_text=ocr_text)

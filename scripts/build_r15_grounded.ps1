@@ -1,5 +1,6 @@
 param(
     [string]$Tag = "ghcr.io/tuancookiez-hub/cliogemma:score-max-r15-grounded",
+    [string]$Pipeline = "score-max-r15-grounded",
     [switch]$Push
 )
 
@@ -16,7 +17,7 @@ $buildArgs = @(
     "--build-arg", "CLIO_VERIFY_MODEL=google/gemma-4-31b-it",
     "--build-arg", "CLIO_CAPTION_MODEL=google/gemma-4-31b-it",
     "--build-arg", "CLIO_VISION_MODEL=moonshotai/kimi-k2.6",
-    "--build-arg", "CLIO_PIPELINE=score-max-r15-grounded",
+    "--build-arg", "CLIO_PIPELINE=$Pipeline",
     "--build-arg", "SWIFTCLIP_FRAME_STRATEGY=anchors",
     "--build-arg", "SWIFTCLIP_FRAME_COUNT=4",
     "--build-arg", "SWIFTCLIP_FRAME_WIDTH=768",
@@ -37,7 +38,7 @@ if ($Push) {
 }
 $buildArgs += "."
 
-Write-Host "Building $Tag (Kimi evidence + image-grounded Gemma batch writer)..."
+Write-Host "Building $Tag (${Pipeline}: Kimi evidence + image-grounded Gemma batch writer)..."
 & docker @buildArgs
 if ($LASTEXITCODE -ne 0) {
     throw "Docker build failed with exit code $LASTEXITCODE"

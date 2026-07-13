@@ -80,10 +80,11 @@ hidden scoring model.
 ## Next measured candidate
 
 The latest official result for r14 is **0.70**. The targeted r15 candidate is
-`score-max-r15-grounded`: Kimi supplies structured evidence, then Gemma sees
-both that evidence and the chronological contact sheet while writing all four
-captions. It is implemented and regression-tested but must be built and
-submitted under a new immutable tag; r14 remains unchanged for comparison.
+`score-max-r16-visual-override`: Kimi supplies structured evidence, then Gemma
+sees both that evidence and the chronological contact sheet while writing all
+four captions. Gemma is explicitly instructed to correct Kimi when the pixels
+disagree. It is implemented and regression-tested and should be built under a
+new immutable tag; r14 remains unchanged for comparison.
 
 See [the r15 plan](docs/R15_GROUNDED_BATCH_PLAN.md) for the exact build command
 and rationale.

@@ -1,6 +1,6 @@
 # r15 grounded batch candidate
 
-**Status:** implemented locally; not yet built or submitted
+**Status:** r15 implemented and smoke-tested; r16 visual-override follow-up is the current candidate
 
 ## Why r14 stalled at 0.70
 
@@ -64,3 +64,21 @@ but only the AMD judge can establish the score.
 - `git diff --check`: passed
 - New regression test confirms Kimi and Gemma each receive the chronological
   contact sheet and that Gemma remains the emitting model.
+
+## r16 visual-override follow-up
+
+The eight-clip r15 smoke completed in 99 seconds with 8/8 valid task results,
+but the trace showed Kimi mislabeling a zucchini as cucumber and the bleacher
+colors. r16 keeps the same runtime and model roles and adds an explicit rule:
+Gemma must resolve any evidence/image conflict from the pixels, instead of
+mechanically copying the Kimi noun. It also requires each technical joke to map
+to the visible action rather than merely naming an object.
+
+Build r16 with the same script:
+
+```powershell
+.\scripts\build_r15_grounded.ps1 `
+  -Pipeline score-max-r16-visual-override `
+  -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r16-visual-override `
+  -Push
+```
