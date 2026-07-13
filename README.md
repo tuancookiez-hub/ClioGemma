@@ -94,6 +94,10 @@ The r19 detail-preserving variant keeps visibly supported object nouns and
 colors during Gemma review and requires two concrete formal details:
 `score-max-r19-qwen-detail-preserving`.
 
+The reliability-final package is
+`score-max-r20-qwen-gemma-reliable`, with wider request and per-clip margins to
+avoid skipping Gemma verification during transient provider latency.
+
 See [the r15 plan](docs/R15_GROUNDED_BATCH_PLAN.md) for the exact build command
 and rationale.
 

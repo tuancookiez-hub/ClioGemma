@@ -61,6 +61,7 @@ with 32/32 captions and anonymous GHCR manifest HTTP 200 verification.
 | `score-max-r17-verified-grounded-v2` | Same verified-grounded path with 40-second provider requests so Gemma review can complete | Pending |
 | `score-max-r18-qwen-gemma-verified` | Qwen3.5 perception, Gemma visual review, and Gemma final captions | Pending |
 | `score-max-r19-qwen-detail-preserving` | r18 plus preservation of visibly supported object nouns/colors and two formal details | Pending |
+| `score-max-r20-qwen-gemma-reliable` | r19 with 50-second provider requests and 150-second per-clip margin | Pending |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.

@@ -137,3 +137,21 @@ supported, and include at least two distinctive details in formal captions.
   -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r19-qwen-detail-preserving `
   -Push
 ```
+
+## r20 reliability package
+
+The r19 eight-clip run completed in 202 seconds with no fallbacks, but one
+Gemma review request exceeded 40 seconds and correctly fell back to the Qwen
+record. r20 raises the provider request limit to 50 seconds and the per-clip
+limit to 150 seconds; the eight-clip run remains comfortably below the 570-second
+global contract.
+
+```powershell
+.\scripts\build_r15_grounded.ps1 `
+  -Pipeline score-max-r17-verified-grounded `
+  -VisionModel qwen/qwen3.5-397b-a17b `
+  -ClipTimeout 150 `
+  -RequestTimeout 50 `
+  -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r20-qwen-gemma-reliable `
+  -Push
+```
