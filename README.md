@@ -79,12 +79,11 @@ hidden scoring model.
 
 ## Next measured candidate
 
-The latest official result for r14 is **0.70**. The targeted r15 candidate is
-`score-max-r16-visual-override`: Kimi supplies structured evidence, then Gemma
-sees both that evidence and the chronological contact sheet while writing all
-four captions. Gemma is explicitly instructed to correct Kimi when the pixels
-disagree. It is implemented and regression-tested and should be built under a
-new immutable tag; r14 remains unchanged for comparison.
+The latest official result for r14 is **0.70**. The current candidate is
+`score-max-r17-verified-grounded`: Kimi supplies structured evidence, Gemma
+reviews that evidence against the chronological contact sheet, and Gemma then
+writes all four captions from the reviewed evidence and images. This follows r16
+smoke evidence that two Kimi visual noun errors still propagated to the output.
 
 See [the r15 plan](docs/R15_GROUNDED_BATCH_PLAN.md) for the exact build command
 and rationale.

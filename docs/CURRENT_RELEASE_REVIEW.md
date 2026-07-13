@@ -57,6 +57,7 @@ with 32/32 captions and anonymous GHCR manifest HTTP 200 verification.
 | `score-max-r15-grounded` | Four-frame Kimi evidence plus the chronological contact sheet in Gemma's final batch call | Pending |
 | `score-max-r15-grounded-fix` | Dispatcher-corrected r15 image-grounded batch path | Pending |
 | `score-max-r16-visual-override` | r15 path plus explicit Gemma visual correction when Kimi evidence conflicts with pixels | Pending |
+| `score-max-r17-verified-grounded` | Kimi evidence, Gemma image review, then image-grounded Gemma batch writing | Pending |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.

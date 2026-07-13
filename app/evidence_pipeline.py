@@ -1310,15 +1310,16 @@ def _caption_clip_verified3(
         "kimi-gemma-grounded-fast",
         "score-max-r15-grounded",
         "score-max-r16-visual-override",
+        "score-max-r17-verified-grounded",
     }
     score_max_mode = pipeline in {"score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
-    reference_mode = pipeline in {"hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1", "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override"}
+    reference_mode = pipeline in {"hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1", "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override", "score-max-r17-verified-grounded"}
     gemma_reference_mode = pipeline in {"gemma-reference", "reference-gemma-r1"}
     concise_mode = pipeline in {"verified5-concise", "verified-5-concise", "precision", "concise"}
     champion_mode = pipeline in {"verified5-champion", "verified-5-champion", "champion-r3", "gemma-champion", "champion-r2"}
     batch_mode = fast_batch_mode or grounded_batch_mode or pipeline in {"champion-batch", "gemma-champion-batch", "champion-r4", "hybrid-kimi-batch", "kimi-grounded-batch"}
     hybrid_mode = fast_batch_mode or grounded_batch_mode or pipeline in {"verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi", "hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "hybrid-kimi-reference", "reference-r1", "score-r1", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
-    hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1"}
+    hybrid_verified_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "hybrid-kimi-batch", "kimi-grounded-batch", "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1", "score-max-r17-verified-grounded"}
     balanced_mode = pipeline in {
         "verified5-balanced", "verified-5-balanced", "stylecal", "rebalanced",
         "verified5-kimi", "verified-5-kimi", "kimi-grounded", "hybrid-kimi",
@@ -1327,7 +1328,7 @@ def _caption_clip_verified3(
         "hybrid-kimi-batch", "kimi-grounded-batch",
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
-        "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override",
+        "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override", "score-max-r17-verified-grounded",
     }
     persona_mode = pipeline in {
         "verified5", "verified-5", "verified5-concise", "verified-5-concise", "precision", "concise",
@@ -1338,7 +1339,7 @@ def _caption_clip_verified3(
         "hybrid-kimi-batch", "kimi-grounded-batch",
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
-        "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override",
+        "fast-kimi-gemma", "kimi-gemma-fast", "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override", "score-max-r17-verified-grounded",
         "persona", "persona-grounded",
     }
     eight_frame_mode = pipeline in {"hybrid-kimi8", "kimi-grounded8", "champion-r3", "hybrid-kimi-batch", "kimi-grounded-batch"}
@@ -1660,7 +1661,7 @@ def caption_clip_evidence(
         "hybrid-kimi-reference", "reference-r1", "score-r1", "gemma-reference", "reference-gemma-r1",
         "score-max-r1", "kimi-gemma-ensemble", "ensemble-r1",
         "fast-kimi-gemma", "kimi-gemma-fast",
-        "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override",
+        "fast-kimi-gemma-grounded", "kimi-gemma-grounded-fast", "score-max-r15-grounded", "score-max-r16-visual-override", "score-max-r17-verified-grounded",
         "persona", "persona-grounded",
     }:
         return _caption_clip_verified3(frames, task_id, config, deadline, ocr_text=ocr_text)

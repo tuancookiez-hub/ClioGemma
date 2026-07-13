@@ -82,3 +82,20 @@ Build r16 with the same script:
   -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r16-visual-override `
   -Push
 ```
+
+## r17 verified-grounded follow-up
+
+r16 still produced the same two Kimi noun errors on a focused v7/v8 smoke.
+r17 adds the existing Gemma visual-review stage between Kimi evidence and the
+Gemma writer. This gives Gemma one explicit opportunity to correct object
+identity, colors, and timeline claims while looking at the images. It uses three
+bounded provider calls per clip and a 105-second per-clip budget; the global
+runner limit remains 570 seconds.
+
+```powershell
+.\scripts\build_r15_grounded.ps1 `
+  -Pipeline score-max-r17-verified-grounded `
+  -ClipTimeout 105 `
+  -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r17-verified-grounded `
+  -Push
+```
