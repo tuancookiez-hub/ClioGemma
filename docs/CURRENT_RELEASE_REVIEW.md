@@ -9,12 +9,12 @@
 ## Executive decision
 
 There is one Track 2 submission. The following immutable candidate is the
-recommended submission because it combines the source-derived improvements
-with Gemma-owned caption emission:
+recommended submission because it combines Qwen visual perception, Gemma 4
+visual verification, and Gemma-owned caption emission:
 
-`ghcr.io/tuancookiez-hub/cliogemma:score-max-r14-final`
+`ghcr.io/tuancookiez-hub/cliogemma:score-max-r20-qwen-gemma-reliable`
 
-Digest: `sha256:a725991b36f7f2b4215e00d76202d6a119db74b40ce4c19346134b13c6548153`
+Digest: `sha256:1562851f5271a5a0dfa34ffacc12bcde78c3467acb2585c7809684fe65ae2c41`
 
 Earlier research candidate: `ghcr.io/tuancookiez-hub/cliogemma:score-max-r8-qwen-deepseek`
 
@@ -24,8 +24,9 @@ Earlier variance candidate: `ghcr.io/tuancookiez-hub/cliogemma:score-max-r9-stab
 
 Digest: `sha256:9d2cd8fa19a82dc5e5caecb4eb71c88863665a125e273433003608317b296152`
 
-The latest confirmed ClioGemma score is **0.77**. The strongest confirmed
-control is **0.85**, earned by the older four-frame `verified5` architecture.
+The latest confirmed pre-r20 ClioGemma score recorded for this release review
+is **0.77**. The strongest confirmed control is **0.85**, earned by the older
+four-frame `verified5` architecture.
 The eight-frame pairs/selector experiment scored **0.59** and the concise
 four-frame follow-up scored **0.72**. Local testing establishes contract,
 runtime, and qualitative readiness; it does not prove a score above 0.92.
@@ -162,14 +163,14 @@ Source-derived candidate runs on all eight retired AMD videos:
 - r8 Qwen/DeepSeek: 8/8 and 32/32 in 272.3 seconds at task parallelism three
 - no empty outputs or schema failures
 
-Published artifact validation:
+Published artifact validation (local):
 
-- public Linux/amd64 OCI manifest
-- anonymous registry request: HTTP 200
+- Linux/amd64 OCI manifest
+- anonymous registry request: **must be rechecked after the package is made public**
 - r6 digest: `sha256:2d7eac8954a5a8831608886f6398084086d82ac8016c228e8cc5d51f4f1154e8`
 - r8 digest: `sha256:e10362b03f5527a6a32e31119331f2a3ecee78bf60cbc8c04cb7e04775b19418`
 - judge-style run with no source mount and no environment override
-- 8/8 retired tasks, 32/32 captions, valid schema, exit code 0
+- r20: 8/8 retired tasks, 32/32 captions, valid schema, exit code 0, 146.0 seconds
 
 ## Score assessment
 

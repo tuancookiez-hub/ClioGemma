@@ -51,13 +51,13 @@ localhost URL.
 
 ### Docker image
 
-`ghcr.io/tuancookiez-hub/cliogemma:score-max-r5`
+`ghcr.io/tuancookiez-hub/cliogemma:score-max-r20-qwen-gemma-reliable`
 
-Digest: `sha256:b1fe388ebf6ebfd2b0d0326adecf46be82578a47679ba8931ea98894e5c97156`
+Digest: `sha256:1562851f5271a5a0dfa34ffacc12bcde78c3467acb2585c7809684fe65ae2c41`
 
 ### Additional information
 
-> ClioGemma's submission image is a public `linux/amd64` container following the Track 2 contract: it reads `/input/tasks.json`, returns every requested style, writes valid `/output/results.json`, and exits cleanly. Scene-aware six-frame sampling and optional OCR feed Kimi K2.6 visual evidence and style candidates; Gemma 4 performs verification, final selection, and repairs. The exact image completed all eight retired validation clips in 351.2 seconds with 32/32 captions and passed anonymous GHCR manifest verification. No hardcoded evaluator answer or external judge is used.
+> ClioGemma's submission image is a `linux/amd64` container following the Track 2 contract: it reads `/input/tasks.json`, returns every requested style, writes valid `/output/results.json`, and exits cleanly. Scene-aware chronological frames feed Qwen3.5 visual evidence; Gemma 4 verifies the evidence and emits all final captions. The exact image completed all eight retired validation clips in 146.0 seconds with 32/32 captions. No hardcoded evaluator answer or external judge is used. Make the GHCR package public before submitting.
 
 ### Gemma-only control
 
@@ -67,9 +67,9 @@ If you want the strictly Gemma-only variant, use:
 
 ## Final checklist
 
-- [x] Push the exact public Linux/amd64 image tag above.
+- [x] Push the exact Linux/amd64 image tag above.
 - [x] Record its manifest digest.
-- [x] Verify anonymous manifest access.
+- [ ] Verify anonymous manifest access after changing package visibility to Public.
 - [x] Run the exact published tag with mounted `/input` and `/output`.
 - [x] Confirm every task ID and requested style is present and non-empty.
 - [x] Push the current source and documentation to GitHub.
