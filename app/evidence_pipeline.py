@@ -154,7 +154,8 @@ animal, vehicle, or action merely because it is brief: describe the dominant vis
 event when the sequence clearly supports it.
 
 formal: one documentary-quality sentence naming the main subject or action, setting,
-and one or two distinctive visible details. Be objective and professional. Do not
+and at least two distinctive visible details when the images support them. Be objective
+and professional. Do not
 mention camera movement, distant scenery, or peripheral accessories unless central.
 
 sarcastic: state the literal scene first, then one dry, scene-specific contrast or
@@ -270,7 +271,10 @@ only, without markdown."""
 _VERIFIED3_REVIEW_PROMPT = """Act as a strict second visual observer. Compare
 the draft evidence record below against the chronological images. Remove
 or correct every unsupported detail. Preserve useful specificity when it is
-clearly visible. Put ambiguous identities, relationships, brands, locations,
+clearly visible, including specific object nouns and colors. Do not replace a
+visibly supported detail with a vague category merely because the first observer
+was cautious; use a generic term only when the images genuinely cannot establish
+the specific identity. Put ambiguous identities, relationships, brands, locations,
 exact counts, motives, emotions, audio, inferred actions, and unseen outcomes
 in do_not_claim. Return the same exact JSON schema and nothing else.
 

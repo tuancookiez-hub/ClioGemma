@@ -120,3 +120,20 @@ Gemma for every final caption.
   -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r18-qwen-gemma-verified `
   -Push
 ```
+
+## r19 detail-preserving package
+
+The r18 trace showed Qwen had the useful details, but Gemma's review replaced
+them with generic categories before caption writing. r19 changes only the review
+and formal-writing rules: retain a specific object or color when visibly
+supported, and include at least two distinctive details in formal captions.
+
+```powershell
+.\scripts\build_r15_grounded.ps1 `
+  -Pipeline score-max-r17-verified-grounded `
+  -VisionModel qwen/qwen3.5-397b-a17b `
+  -ClipTimeout 105 `
+  -RequestTimeout 40 `
+  -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r19-qwen-detail-preserving `
+  -Push
+```

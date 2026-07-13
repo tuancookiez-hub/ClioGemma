@@ -90,6 +90,10 @@ The strongest measured perception variant is
 reviews it and emits every final caption. On focused public clips it corrected
 the Kimi zucchini and track-detail errors without changing the output contract.
 
+The r19 detail-preserving variant keeps visibly supported object nouns and
+colors during Gemma review and requires two concrete formal details:
+`score-max-r19-qwen-detail-preserving`.
+
 See [the r15 plan](docs/R15_GROUNDED_BATCH_PLAN.md) for the exact build command
 and rationale.
 
