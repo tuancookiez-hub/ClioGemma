@@ -2,6 +2,7 @@ param(
     [string]$Tag = "ghcr.io/tuancookiez-hub/cliogemma:score-max-r15-grounded",
     [string]$Pipeline = "score-max-r15-grounded",
     [int]$ClipTimeout = 65,
+    [int]$RequestTimeout = 20,
     [switch]$Push
 )
 
@@ -27,7 +28,7 @@ $buildArgs = @(
     "--build-arg", "SWIFTCLIP_PARALLEL=2",
     "--build-arg", "SWIFTCLIP_CLIP_TIMEOUT=$ClipTimeout",
     "--build-arg", "SWIFTCLIP_OCR=0",
-    "--build-arg", "CLIO_REQUEST_TIMEOUT=20",
+    "--build-arg", "CLIO_REQUEST_TIMEOUT=$RequestTimeout",
     "--build-arg", "CLIO_RATE_LIMIT_RETRIES=0",
     "--tag", $Tag
 )

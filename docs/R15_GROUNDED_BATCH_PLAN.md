@@ -96,6 +96,7 @@ runner limit remains 570 seconds.
 .\scripts\build_r15_grounded.ps1 `
   -Pipeline score-max-r17-verified-grounded `
   -ClipTimeout 105 `
+  -RequestTimeout 40 `
   -Tag ghcr.io/tuancookiez-hub/cliogemma:score-max-r17-verified-grounded `
   -Push
 ```
