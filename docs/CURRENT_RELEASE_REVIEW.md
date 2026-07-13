@@ -53,7 +53,8 @@ with 32/32 captions and anonymous GHCR manifest HTTP 200 verification.
 | `score-max-r8-qwen-deepseek` | Qwen3.5 chronological grids, Gemma verification/final grounding, DeepSeek V4 Pro style drafting | Not yet scored |
 | `score-max-r9-stable` | r8 architecture with near-zero evidence/final sampling and bounded creative sampling | Not yet scored |
 | `score-max-r10-gemma-stable` | Kimi chronological grids, Gemma generation/selection/verification/repair, stability profile | Not yet scored |
-| `score-max-r14-final` | Four-frame Kimi evidence, one Gemma batch writer, simple reference-shaped captions, bounded latency | Not yet scored |
+| `score-max-r14-final` | Four-frame Kimi evidence, one Gemma batch writer, simple reference-shaped captions, bounded latency | **0.70** |
+| `score-max-r15-grounded` | Four-frame Kimi evidence plus the chronological contact sheet in Gemma's final batch call | Pending |
 
 The jump from 0.68 to 0.85 proves that caption architecture and style identity
 matter much more than retry tuning alone. The remaining target is at least 0.93.
@@ -183,6 +184,12 @@ hidden clips, reference expectations, judge prompt, weighting, and stochastic
 provider behavior are unavailable. The 31/32 public-set advantage is meaningful
 regression evidence, but it is not a calibrated numerical forecast. A 0.93 result
 remains the target; only the hidden AMD judge can establish it.
+
+The subsequent r14 submission scored **0.70**. Its two-call path was reliable,
+but the Gemma batch writer received only serialized Kimi evidence, not the
+images themselves. r15 restores image access to that final call while retaining
+the two-call runtime profile; it is a targeted regression fix, not a guaranteed
+score forecast.
 
 ## Next experiment policy
 

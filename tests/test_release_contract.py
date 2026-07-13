@@ -253,6 +253,7 @@ def test_reference_profile_uses_kimi_grounding_and_skips_global_rewrite(monkeypa
     monkeypatch.setenv("CLIO_CAPTION_MODEL", "google/gemma-4-31b-it")
     monkeypatch.setenv("CLIO_VERIFY_MODEL", "google/gemma-4-31b-it")
     monkeypatch.setenv("CLIO_ENFORCE_NOVITA", "1")
+    monkeypatch.setenv("CLIO_GRID_INPUT", "1")
     config = ProviderConfig("test", "https://api.novita.ai/openai", "google/gemma-4-31b-it", 25.0)
     result = pipeline._caption_clip_verified3(frames, "reference-test", config, None)
     assert set(result) == set(STYLES)
@@ -318,3 +319,57 @@ def test_score_max_profile_uses_kimi_candidates_then_gemma_rerank(monkeypatch: p
     assert any("visual caption candidate generator" in prompt and model == "moonshotai/kimi-k2.6" for model, prompt in calls)
     assert any("final Gemma caption editor" in prompt and model == "google/gemma-4-31b-it" for model, prompt in calls)
     assert not any("Perform one final image-grounded revision" in prompt for _, prompt in calls)
+
+
+def test_grounded_fast_profile_sends_images_to_gemma_writer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import app.evidence_pipeline as pipeline
+
+    frames = []
+    for index in range(4):
+        path = tmp_path / f"grounded-{index}.jpg"
+        path.write_bytes(b"frame")
+        frames.append(Frame(path, index, float(index)))
+
+    evidence = {
+        "scene": "outdoor railway platform",
+        "subjects": ["train", "platform"],
+        "stable_facts": ["a train is visible", "a platform is visible"],
+        "timeline": ["beginning: train beside platform", "end: train remains visible"],
+        "caption_anchor": "A train is beside an outdoor platform",
+        "visible_text": [],
+        "do_not_claim": [],
+    }
+    seen: list[tuple[str, int, str]] = []
+
+    def fake_call(config, content, *, deadline, max_tokens, temperature):
+        prompt = " ".join(str(part.get("text", "")) for part in content if part.get("type") == "text")
+        image_count = sum(1 for part in content if part.get("type") == "image_url")
+        seen.append((config.model, image_count, prompt))
+        if "Inspect the chronological images as one" in prompt:
+            return json.dumps(evidence)
+        if "final Gemma writer" in prompt:
+            return json.dumps({
+                "formal": "A train passes an outdoor platform beside a wooded railway setting with a visible track.",
+                "sarcastic": "A train passes an outdoor platform, apparently treating the station as a suggestion.",
+                "humorous_tech": "A train passes an outdoor platform like a packet following one clearly marked route.",
+                "humorous_non_tech": "A train passes an outdoor platform like someone taking the scenic way home.",
+            })
+        raise AssertionError(f"unexpected grounded profile prompt: {prompt[:100]}")
+
+    monkeypatch.setattr(pipeline, "_call", fake_call)
+    monkeypatch.setenv("CLIO_PIPELINE", "score-max-r15-grounded")
+    monkeypatch.setenv("CLIO_VISION_MODEL", "moonshotai/kimi-k2.6")
+    monkeypatch.setenv("CLIO_CAPTION_MODEL", "google/gemma-4-31b-it")
+    monkeypatch.setenv("CLIO_VERIFY_MODEL", "google/gemma-4-31b-it")
+    monkeypatch.setenv("CLIO_ENFORCE_NOVITA", "1")
+    monkeypatch.setenv("CLIO_GRID_INPUT", "1")
+    config = ProviderConfig("test", "https://api.novita.ai/openai", "google/gemma-4-31b-it", 25.0)
+
+    result = pipeline._caption_clip_verified3(frames, "grounded-test", config, None)
+
+    assert set(result) == set(STYLES)
+    assert seen[0][0] == "moonshotai/kimi-k2.6"
+    assert seen[0][1] == 1  # Kimi receives one chronological contact sheet
+    assert seen[1][0] == "google/gemma-4-31b-it"
+    assert seen[1][1] == 1  # one labelled contact-sheet grid when grid input is enabled
+    assert not pipeline._caption_batch_issues(result)
